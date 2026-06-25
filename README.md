@@ -19,7 +19,15 @@ curl -fsSL https://raw.githubusercontent.com/workzone-vn/wz-bien-ban/main/instal
 Xong thì mở lại Claude Code. Hướng dẫn có hình: `huong-dan/HUONG-DAN-CAI-DAT.pdf`.
 
 
-## Dùng hàng ngày - chỉ 2 lệnh
+## 3 cách dùng (cùng 1 engine local)
+
+Bộ cài 1 lệnh ở trên thiết lập sẵn cả 3, dùng cái nào tùy app bạn xài:
+
+1. **Claude Code** - gõ `/bat-dau-hop` rồi `/ket-thuc-hop`.
+2. **Claude Desktop** (MCP) - nói "bắt đầu họp" ... "kết thúc họp, viết biên bản". Claude tự gọi tool, viết biên bản bằng subscription của bạn.
+3. **App menu-bar** (macOS) - build bằng `bash app/build_app.sh` → `WZ Bien Ban.app`. Icon 🎙️ trên thanh menu, bấm "Bắt đầu họp" / "Kết thúc & tạo biên bản". Phát hành cho người khác: xem `app/SIGNING.md`.
+
+## Dùng hàng ngày - chỉ 2 lệnh (Claude Code)
 
 | Gõ trong Claude Code | Kết quả |
 |---|---|
