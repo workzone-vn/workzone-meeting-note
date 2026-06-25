@@ -59,7 +59,7 @@ def _recording():
 
 class WZApp(rumps.App):
     def __init__(self):
-        super().__init__("WZ", title="🎙️ WZ", quit_button=None)
+        super().__init__("Workzone Meeting Note", title="🎙️", quit_button=None)
         self.menu = [
             rumps.MenuItem("● Bắt đầu họp", callback=self.start),
             rumps.MenuItem("■ Kết thúc & tạo biên bản", callback=self.stop),
@@ -79,7 +79,7 @@ class WZApp(rumps.App):
 
     def _first_run_install(self):
         """Lần mở đầu: tự tải engine + model + đăng ký MCP (không cần cài tay)."""
-        rumps.notification("WZ Biên Bản", "Đang cài đặt lần đầu",
+        rumps.notification("Workzone Meeting Note", "Đang cài đặt lần đầu",
                            "Tải bộ nhận giọng nói (~3GB), chờ vài phút. Đừng tắt app.")
         try:
             subprocess.run(
@@ -91,10 +91,10 @@ class WZApp(rumps.App):
             pass
         self._installing = False
         if VENV_PY.exists():
-            rumps.notification("WZ Biên Bản", "Cài xong ✓",
+            rumps.notification("Workzone Meeting Note", "Cài xong ✓",
                                "Sẵn sàng. Bấm 'Bắt đầu họp' để ghi.")
         else:
-            rumps.notification("WZ Biên Bản", "Cài chưa xong",
+            rumps.notification("Workzone Meeting Note", "Cài chưa xong",
                                "Mở Terminal chạy: curl -fsSL .../install.sh | bash")
 
     def _tick(self, _):
@@ -105,35 +105,35 @@ class WZApp(rumps.App):
             mins = (time.time() - st["started"]) / 60
             self.title = f"🔴 {mins:.0f}′"
         elif self._busy:
-            self.title = "⏳ WZ"
+            self.title = "⏳"
         else:
-            self.title = "🎙️ WZ"
+            self.title = "🎙️"
 
     def start(self, _):
         if self._installing:
-            rumps.notification("WZ Biên Bản", "Đang cài đặt lần đầu", "Chờ cài xong rồi ghi nhé.")
+            rumps.notification("Workzone Meeting Note", "Đang cài đặt lần đầu", "Chờ cài xong rồi ghi nhé.")
             return
         if not VENV_PY.exists():
             rumps.alert("Chưa cài đặt", "Chạy cài đặt trước (xem 'Trạng thái cài đặt').")
             return
         if _recording():
-            rumps.notification("WZ Biên Bản", "", "Đang ghi rồi - hãy kết thúc trước.")
+            rumps.notification("Workzone Meeting Note", "", "Đang ghi rồi - hãy kết thúc trước.")
             return
         rc, _out = _engine("record-start")
         if rc == 0:
-            rumps.notification("WZ Biên Bản", "Đang ghi cuộc họp",
+            rumps.notification("Workzone Meeting Note", "Đang ghi cuộc họp",
                                "Bật loa ngoài nếu chưa cài BlackHole. Xong bấm 'Kết thúc'.")
         else:
-            rumps.notification("WZ Biên Bản", "Không bắt đầu được", _out[-180:])
+            rumps.notification("Workzone Meeting Note", "Không bắt đầu được", _out[-180:])
 
     def stop(self, _):
         if not _recording():
-            rumps.notification("WZ Biên Bản", "", "Không có cuộc họp nào đang ghi.")
+            rumps.notification("Workzone Meeting Note", "", "Không có cuộc họp nào đang ghi.")
             return
         if self._busy:
             return
         self._busy = True
-        rumps.notification("WZ Biên Bản", "Đang xử lý", "Dừng ghi và tạo transcript...")
+        rumps.notification("Workzone Meeting Note", "Đang xử lý", "Dừng ghi và tạo transcript...")
         threading.Thread(target=self._do_stop, daemon=True).start()
 
     def _do_stop(self):
@@ -144,10 +144,10 @@ class WZApp(rumps.App):
             if line.startswith("OUTPUT_DIR="):
                 name = Path(line.split("=", 1)[1]).name
         if rc == 0 and name:
-            rumps.notification("WZ Biên Bản", "Transcript xong ✓",
+            rumps.notification("Workzone Meeting Note", "Transcript xong ✓",
                                "Mở Claude và gõ: viết biên bản cuộc họp vừa rồi")
         else:
-            rumps.notification("WZ Biên Bản", "Có lỗi khi transcript", out[-180:])
+            rumps.notification("Workzone Meeting Note", "Có lỗi khi transcript", out[-180:])
 
     def open_folder(self, _):
         OUTPUT.mkdir(parents=True, exist_ok=True)
@@ -163,7 +163,7 @@ class WZApp(rumps.App):
                         "workzone-vn/wz-bien-ban/main/install.sh | bash")
             return
         rc, out = _engine("check")
-        rumps.alert("WZ Biên Bản", out.strip() or "OK")
+        rumps.alert("Workzone Meeting Note", out.strip() or "OK")
 
     def quit_app(self, _):
         rumps.quit_application()
