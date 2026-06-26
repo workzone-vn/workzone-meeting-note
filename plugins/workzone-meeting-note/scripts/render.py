@@ -220,10 +220,17 @@ _VIEWER = r"""<title>Biên bản: {{TITLE}}</title>
 
 _PRINT = r"""<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Bien ban {{TITLE}}</title>
 <style>
-  @page{size:A4;margin:18mm 16mm 16mm}
+  @page{size:A4;margin:22mm 16mm 16mm}
   *{box-sizing:border-box}html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   body{margin:0;color:#26303f;font-family:"Helvetica Neue",Arial,"Arial Unicode MS",sans-serif;font-size:11pt;line-height:1.55}
   h1,h2,h3{color:#1c3d6e;text-wrap:balance}
+  /* Header chạy trên MỌI trang */
+  .runhead{position:fixed;top:-13mm;left:0;right:0;display:flex;justify-content:space-between;
+    align-items:center;font-size:8pt;color:#8a99ad;border-bottom:.6pt solid #e2e9f3;padding-bottom:3pt}
+  .runhead .brand{font-weight:700;color:#1c3d6e;letter-spacing:.02em}
+  .runhead .site{font-weight:700;color:#2f7fd1}
+  .runfoot{position:fixed;bottom:-12mm;left:0;right:0;display:flex;justify-content:space-between;
+    font-size:7.5pt;color:#9aa8b8;border-top:.6pt solid #eef1f6;padding-top:3pt}
   .doc h1{font-size:18pt;line-height:1.25;margin:0 0 .4em}
   .doc h2{font-size:13pt;margin:1.1em 0 .4em;padding-top:.35em;border-top:1px solid #e2e9f3;break-after:avoid}
   .doc h2:first-of-type{border-top:none}
@@ -247,8 +254,10 @@ _PRINT = r"""<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>B
   .ts{color:#3a6fb0;font-variant-numeric:tabular-nums;font-size:8.5pt;font-family:"SF Mono",Menlo,monospace;padding-top:2px}
   .foot{margin-top:6px;font-size:8pt;color:#9aa8b8}
 </style></head><body>
+  <div class="runhead"><span class="brand">Workzone Meeting Note</span><span class="site">workzone.ai.vn</span></div>
+  <div class="runfoot"><span>Biên bản tạo tự động · Whisper large-v3 (local) + Claude</span><span>workzone.ai.vn</span></div>
   <div class="doc"><div class="cover">
-    <div class="eyebrow">Biên bản cuộc họp · WZ Biên Bản</div>
+    <div class="eyebrow">Biên bản cuộc họp · Workzone</div>
     <h1>{{TITLE}}</h1>
     <div class="meta">Thời lượng <b>{{DURATION}}</b> &middot; <b>{{COUNT}}</b> đoạn lời</div>
   </div>{{BIENBAN}}</div>
@@ -256,6 +265,5 @@ _PRINT = r"""<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>B
   <div class="tr-head"><h2>Transcript chi tiết</h2>
     <div class="sub">Bản ghi thô theo thời gian (đã lọc nhiễu), giữ nguyên lời nói chưa biên tập.</div></div>
   <div>{{TRANSCRIPT}}</div>
-  <div class="foot">Tạo bằng WZ Biên Bản · Whisper large-v3 (local).</div>
 </body></html>
 """
