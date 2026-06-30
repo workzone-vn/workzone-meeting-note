@@ -13,7 +13,7 @@ Dùng Bash tool chạy lệnh sau (tên cuộc họp lấy từ `$ARGUMENTS`, đ
 
 Sau khi chạy xong:
 - Báo người dùng đang ghi âm.
-- Nhắc ngắn gọn: nếu chưa cài BlackHole thì bật loa ngoài (không đeo tai nghe) để mic bắt được tiếng mọi người.
+- Nếu output có dòng `WARN_SILENT` (mic không có tín hiệu): cảnh báo người dùng nên dừng, kiểm tra mic/quyền Micro, rồi ghi lại - đừng để mất cả buổi.
 - Nói rõ: họp xong chỉ cần gõ **kết thúc họp** là có biên bản.
 
-KHÔNG làm gì thêm. Không transcribe gì lúc này.
+KHÔNG làm gì thêm. Không transcribe gì lúc này. KHÔNG hỏi gì.

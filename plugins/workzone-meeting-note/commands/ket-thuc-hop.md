@@ -2,7 +2,9 @@
 description: Kết thúc cuộc họp, tạo biên bản + PDF tự động
 ---
 
-Người dùng KẾT THÚC cuộc họp. Hãy chạy đủ chuỗi sau, tuần tự bằng Bash tool và các tool đọc/ghi file:
+Người dùng KẾT THÚC cuộc họp. Hãy chạy đủ chuỗi sau MỘT MẠCH, tuần tự bằng Bash tool và các tool đọc/ghi file.
+
+**QUAN TRỌNG - KHÔNG HỎI GÌ CẢ:** Tự động làm hết từ đầu đến cuối rồi mới báo kết quả. KHÔNG dừng lại xin xác nhận, KHÔNG đặt câu hỏi cho người dùng ở bất kỳ bước nào (kể cả gán tên người nói), KHÔNG kết thúc bằng câu hỏi kiểu "có cần... không?".
 
 ## Bước 1 - Dừng ghi + transcript (chạy local)
 ```
@@ -17,7 +19,7 @@ Lệnh in ra dòng `OUTPUT_DIR=<đường-dẫn>`. Ghi nhớ đường dẫn nà
 ## Bước 3 - Viết biên bản vào `<OUTPUT_DIR>/bien-ban.md`
 Yêu cầu nội dung:
 - Sửa lỗi nhận dạng theo glossary (tên riêng, thuật ngữ chuyên ngành).
-- Nếu transcript có nhãn `[SPEAKER_00]`... và bạn chưa rõ ai là ai, hỏi người dùng danh sách người tham dự để gán tên thật (nếu không có nhãn thì bỏ qua, chỉ viết theo nội dung).
+- Nếu transcript có nhãn `[SPEAKER_00]`... và chưa rõ ai là ai: cứ để "Người nói 1", "Người nói 2"... hoặc suy theo ngữ cảnh. TUYỆT ĐỐI không dừng lại hỏi. Không có nhãn thì viết theo nội dung.
 - Cấu trúc: Tiêu đề + ngày; **Tóm tắt** (3-6 gạch đầu dòng); **Nội dung chính** (theo chủ đề); **Quyết định**; **Action items** (bảng: Việc | Người phụ trách | Deadline).
 - Lọc các đoạn nhiễu vô nghĩa (ký tự lặp như "à à à", "km km").
 
@@ -30,5 +32,5 @@ Quy ước trình bày (bắt buộc):
 "$HOME/wz-bien-ban/.venv/bin/python" "${CLAUDE_PLUGIN_ROOT}/scripts/wz.py" pdf "<TÊN>"
 ```
 
-## Bước 5 - Báo cáo
-Cho người dùng biết: đường dẫn `bien-ban.pdf` (đã mở sẵn), tóm tắt 3-4 ý chính + action items quan trọng. Hỏi có cần tạo trang xem HTML (`wz.py viewer <TÊN>`) hoặc chỉnh gì không.
+## Bước 5 - Báo cáo (kết thúc, KHÔNG hỏi)
+Cho người dùng biết: đường dẫn `bien-ban.pdf` (đã mở sẵn), tóm tắt 3-4 ý chính + action items quan trọng. DỪNG ở đây. KHÔNG hỏi có cần tạo HTML / chỉnh sửa / làm gì thêm.
