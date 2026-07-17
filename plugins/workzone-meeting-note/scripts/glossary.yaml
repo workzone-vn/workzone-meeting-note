@@ -1,34 +1,54 @@
-# Glossary sửa thuật ngữ + tên riêng cho transcript Work Zone.
+# Glossary sửa thuật ngữ cho transcript - bộ SỬA LỖI CHUNG của sản phẩm.
 # Claude dùng file này để sửa lỗi nhận dạng của Whisper khi viết biên bản.
-# Thêm tên người/đối tác/sản phẩm hay bị nghe nhầm vào đây.
+#
+# File này KHÔNG chứa thông tin cá nhân hay tên công ty - chỉ gồm các thuật
+# ngữ chung mà người Việt hay phát âm sai / Whisper hay nghe nhầm.
+#
+# Tên người / công ty / sản phẩm CỦA BẠN: thêm vào file riêng trên máy bạn
+#   ~/wz-bien-ban/glossary.yaml  (sửa ngay trong app: Cài đặt -> Từ điển)
+# Engine tự gộp cả hai khi viết biên bản. File riêng không đi kèm sản phẩm.
 
-# Tên người (chuẩn)
-people:
-  - Hoàng Đình Dũng        # Giám đốc Work Zone
-  - Lê Văn Ninh            # Tech Lead (Signal)
-  - Bùi Thanh Tuấn         # Chợ Agent + AI Growth Hacking
-  - Vân Anh                # CEO Bee Pro
-
-# Thương hiệu / công ty
-brands:
-  - Work Zone
-  - Bee Pro
-  - AdsPlus
-  - Signal
-  - Omicare
-  - Jupviec
-
-# Thuật ngữ hay bị nghe nhầm (sai -> đúng)
+# Thuật ngữ chung hay bị nghe nhầm (sai -> đúng)
 fixes:
-  oát giôn: Work Zone
-  quắc giôn: Work Zone
-  bi pro: Bee Pro
-  ép pi pro: Bee Pro
-  át plớt: AdsPlus
-  sích nồ: Signal
+  # Công nghệ
   ây ai: AI
   ây pi ai: API
   cờ rim: CRM
+  i ơ rờ pi: ERP
   ây dôn: Agent
-  prompt: prompt
+  ê dần: Agent
   to ken: token
+  đa ta: data
+  đây ta: data
+  đa ta bết: database
+  sốp que: software
+  áp: app
+  oép sai: website
+  i meo: email
+  đao lốt: download
+  áp đết: update
+  ắp gờ rết: upgrade
+  boác cạp: backup
+  sơ vơ: server
+  cờ lao: cloud
+  đe mô: demo
+  # Công việc / cuộc họp
+  mít tinh: meeting
+  đét lai: deadline
+  đét lài: deadline
+  ắc sừn ai tem: action item
+  ki pi ai: KPI
+  ô kê a rờ: OKR
+  rì pọt: report
+  phít bách: feedback
+  phít béc: feedback
+  pờ ro dệt: project
+  rô đờ mép: roadmap
+  pờ lan: plan
+  bắt dét: budget
+  ma két tinh: marketing
+  sêu: sale
+  con tên: content
+  pho lâu ắp: follow-up
+  sê ồ: CEO
+  sê ti ồ: CTO

@@ -14,13 +14,15 @@ Lệnh in ra dòng `OUTPUT_DIR=<đường-dẫn>`. Ghi nhớ đường dẫn nà
 
 ## Bước 2 - Đọc dữ liệu
 - Đọc `<OUTPUT_DIR>/transcript.speakers.txt` (transcript đầy đủ).
-- Đọc `${CLAUDE_PLUGIN_ROOT}/scripts/glossary.yaml` (thuật ngữ + tên riêng cần sửa).
+- Đọc `${CLAUDE_PLUGIN_ROOT}/scripts/glossary.yaml` (thuật ngữ chung cần sửa).
+- Đọc thêm ngữ cảnh của người dùng nếu tồn tại (văn bản tự do, ưu tiên khi trùng):
+  `$HOME/wz-bien-ban/profiles/Cá nhân/context.md` (hoặc file cũ `.../Cá nhân/glossary.yaml`, `$HOME/wz-bien-ban/glossary.yaml`).
 
 ## Bước 3 - Viết biên bản vào `<OUTPUT_DIR>/bien-ban.md`
 Yêu cầu nội dung:
 - Sửa lỗi nhận dạng theo glossary (tên riêng, thuật ngữ chuyên ngành).
 - Nếu transcript có nhãn `[SPEAKER_00]`... và chưa rõ ai là ai: cứ để "Người nói 1", "Người nói 2"... hoặc suy theo ngữ cảnh. TUYỆT ĐỐI không dừng lại hỏi. Không có nhãn thì viết theo nội dung.
-- Cấu trúc: Tiêu đề + ngày; **Tóm tắt** (3-6 gạch đầu dòng); **Nội dung chính** (theo chủ đề); **Quyết định**; **Action items** (bảng: Việc | Người phụ trách | Deadline).
+- Cấu trúc (đúng thứ tự, đề mục lớn đánh số): Tiêu đề + ngày; **1. Tóm tắt** (3-6 gạch đầu dòng); **2. Action items** (bảng: Việc | Người phụ trách | Deadline); **3. Nội dung chính** (theo chủ đề, mục con 3.1, 3.2...); **4. Quyết định**.
 - Lọc các đoạn nhiễu vô nghĩa (ký tự lặp như "à à à", "km km").
 
 Quy ước trình bày (bắt buộc):

@@ -73,7 +73,8 @@ def trang_thai() -> str:
 def ket_thuc_va_transcript() -> str:
     """Dừng ghi âm, chạy transcript local (Whisper large-v3), trả về TOÀN BỘ transcript.
     Gọi khi người dùng nói 'kết thúc họp'. Sau khi nhận transcript, hãy VIẾT BIÊN BẢN
-    (tóm tắt, quyết định, action items dạng bảng; tiếng Việt; không em-dash) rồi gọi
+    (đề mục lớn đánh số theo thứ tự: 1. Tóm tắt, 2. Action items dạng bảng,
+    3. Nội dung chính, 4. Quyết định; tiếng Việt; không em-dash) rồi gọi
     tool luu_bien_ban để lưu + xuất PDF."""
     _quiet(wz.ensure_ffmpeg)
     if not wz.STATE.exists():

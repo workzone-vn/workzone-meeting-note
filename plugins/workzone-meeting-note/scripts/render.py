@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render biên bản + transcript ra HTML (xem) và HTML in (cho PDF). Brand Work Zone."""
+"""Render biên bản + transcript ra HTML (xem) và HTML in (cho PDF). Brand WZ."""
 import html
 import json
 import re
@@ -56,6 +56,8 @@ def _md_inline(s):
     s = html.escape(s)
     s = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", s)
     s = re.sub(r"`(.+?)`", r"<code>\1</code>", s)
+    # quy ước biên bản dùng <br> để xuống dòng -> trả lại thẻ thật sau khi escape
+    s = re.sub(r"&lt;br\s*/?&gt;", "<br>", s, flags=re.IGNORECASE)
     return s
 
 
@@ -209,7 +211,7 @@ _VIEWER = r"""<title>Biên bản: {{TITLE}}</title>
   @media(max-width:520px){.doc{padding:22px 18px}.line{grid-template-columns:54px 1fr;gap:10px}}
 </style>
 <header class="top"><div class="head-in">
-  <div class="eyebrow">Biên bản cuộc họp · WZ Biên Bản</div>
+  <div class="eyebrow">Biên bản cuộc họp · Claude Recorder</div>
   <h1 class="title">{{TITLE}}</h1>
   <div class="meta">{{STARTED}}<span>⏱ <b>{{DURATION}}</b></span><span>💬 <b>{{COUNT}}</b> đoạn lời</span></div>
 </div></header>
@@ -225,7 +227,7 @@ _VIEWER = r"""<title>Biên bản: {{TITLE}}</title>
     <p class="noresult" id="nr">Không tìm thấy đoạn nào khớp.</p>
   </section>
   <section class="panel" id="p2" role="tabpanel"><article class="doc">{{BIENBAN}}</article></section>
-  <p class="foot">Tạo bằng WZ Biên Bản · Whisper large-v3 (local). Transcript là bản thô.</p>
+  <p class="foot">Tạo bằng Claude Recorder · Whisper large-v3 (local). Transcript là bản thô.</p>
 </div>
 <script>
   function show(n){var a=n===1;p1.classList.toggle('active',a);p2.classList.toggle('active',!a);
@@ -248,11 +250,6 @@ _PRINT = r"""<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>B
   *{box-sizing:border-box}html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   body{margin:0;color:#26303f;font-family:"Helvetica Neue",Arial,"Arial Unicode MS",sans-serif;font-size:11pt;line-height:1.55}
   h1,h2,h3{color:#1c3d6e;text-wrap:balance}
-  /* Letterhead trang đầu (luồng thường, không đè chữ) */
-  .cover-top{display:flex;justify-content:space-between;align-items:center;
-    border-bottom:2pt solid #1c3d6e;padding-bottom:7pt;margin-bottom:14pt}
-  .cover-top .brand{font-size:9pt;font-weight:700;color:#1c3d6e;letter-spacing:.04em;text-transform:uppercase}
-  .cover-top .site{font-size:9.5pt;font-weight:700;color:#2f7fd1}
   .doc h1{font-size:18pt;line-height:1.25;margin:0 0 .4em}
   .doc h2{font-size:13pt;margin:1.1em 0 .4em;padding-top:.35em;border-top:1px solid #e2e9f3;break-after:avoid}
   .doc h2:first-of-type{border-top:none}
@@ -274,10 +271,8 @@ _PRINT = r"""<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>B
   .tr-head .sub{font-size:9pt;color:#6b7c91}
   .line{display:grid;grid-template-columns:54px 1fr;gap:12px;padding:2.5px 0;font-size:10pt;break-inside:avoid}
   .ts{color:#3a6fb0;font-variant-numeric:tabular-nums;font-size:8.5pt;font-family:"SF Mono",Menlo,monospace;padding-top:2px}
-  .foot{margin-top:6px;font-size:8pt;color:#9aa8b8}
 </style></head><body>
   <div class="doc">
-    <div class="cover-top"><span class="brand">Workzone Meeting Note</span><span class="site">workzone.ai.vn</span></div>
     <div class="cover">
       <div class="eyebrow">Biên bản cuộc họp</div>
       <h1>{{TITLE}}</h1>
@@ -287,6 +282,5 @@ _PRINT = r"""<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>B
   <div class="tr-head"><h2>Transcript chi tiết</h2>
     <div class="sub">Bản ghi thô theo thời gian (đã lọc nhiễu), giữ nguyên lời nói chưa biên tập.</div></div>
   <div>{{TRANSCRIPT}}</div>
-  <div class="foot">Tạo tự động bằng Workzone Meeting Note · workzone.ai.vn</div>
 </body></html>
 """
