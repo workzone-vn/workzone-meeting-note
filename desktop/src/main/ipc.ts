@@ -274,12 +274,14 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.glossaryGet, (_e, profile?: string | null) => {
     const f = glossaryFileFor(profile)
     const isPersonal = !profile || profile === PERSONAL_PROFILE
-    const content = fs.existsSync(f)
+    const exists = fs.existsSync(f)
+    const content = exists
       ? fs.readFileSync(f, 'utf8')
       : isPersonal
         ? CONTEXT_TEMPLATE_PERSONAL
         : contextTemplateCompany(profile!)
-    return { content, path: f }
+    // exists: máy mới chưa viết ngữ cảnh -> Home hiện gợi ý khởi tạo
+    return { content, path: f, exists }
   })
   ipcMain.handle(IPC.glossarySave, (_e, content: string, profile?: string | null) => {
     const f = glossaryFileFor(profile)

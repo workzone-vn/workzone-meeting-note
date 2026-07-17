@@ -5,10 +5,12 @@ import { titleCase, tsFull } from '../lib/format'
 
 export function Home({
   recorder,
-  onOpenMeeting
+  onOpenMeeting,
+  onOpenSettings
 }: {
   recorder: RecorderStatus
   onOpenMeeting: (name: string) => void
+  onOpenSettings: () => void
 }): React.JSX.Element {
   const [name, setName] = useState('')
   const [warnSilent, setWarnSilent] = useState(false)
@@ -20,6 +22,8 @@ export function Home({
   const [settings, setSettings] = useState<Settings | null>(null)
   const [profiles, setProfiles] = useState<string[]>([])
   const [selected, setSelected] = useState<string[]>(['Cá nhân'])
+  // Máy mới chưa viết ngữ cảnh cá nhân -> gợi ý khởi tạo (tắt được, nhớ trong máy)
+  const [showContextHint, setShowContextHint] = useState(false)
   const [, forceTick] = useState(0)
 
   useEffect(() => {
@@ -28,6 +32,9 @@ export function Home({
       setSelected(s.lastProfiles)
     })
     void window.wz.profilesList().then(setProfiles)
+    if (localStorage.getItem('wz.contextHintDismissed') !== '1') {
+      void window.wz.glossaryGet(null).then((g) => setShowContextHint(!g.exists))
+    }
   }, [])
 
   const toggle = (p: string): void => {
@@ -89,6 +96,32 @@ export function Home({
       <h1 className="page-title">Ghi âm cuộc họp</h1>
 
       {error && <div className="banner error">{error}</div>}
+      {showContextHint && !recorder.recording && (
+        <div className="banner warn">
+          <b>Mẹo cho biên bản chính xác hơn:</b> viết vài dòng ngữ cảnh riêng của bạn (bạn là ai,
+          đồng nghiệp hay họp cùng, thuật ngữ/tên riêng hay bị nghe sai). AI sẽ dùng khi viết biên
+          bản.{' '}
+          <span style={{ display: 'inline-flex', gap: 6 }}>
+            <button
+              className="btn primary"
+              style={{ padding: '3px 10px', fontSize: '0.84rem' }}
+              onClick={onOpenSettings}
+            >
+              Viết ngữ cảnh
+            </button>
+            <button
+              className="btn"
+              style={{ padding: '3px 10px', fontSize: '0.84rem' }}
+              onClick={() => {
+                localStorage.setItem('wz.contextHintDismissed', '1')
+                setShowContextHint(false)
+              }}
+            >
+              Để sau
+            </button>
+          </span>
+        </div>
+      )}
       {savedName && !recorder.recording && (
         <div className="banner warn">
           <b>

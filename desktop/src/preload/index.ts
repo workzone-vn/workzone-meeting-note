@@ -90,7 +90,7 @@ export const wzApi = {
   settingsGet: (): Promise<Settings> => ipcRenderer.invoke(IPC.settingsGet),
   settingsSet: (patch: Partial<Settings>): Promise<Settings> => ipcRenderer.invoke(IPC.settingsSet, patch),
   engineCheck: (): Promise<EngineCheck> => ipcRenderer.invoke(IPC.engineCheck),
-  glossaryGet: (profile?: string | null): Promise<{ content: string; path: string }> =>
+  glossaryGet: (profile?: string | null): Promise<{ content: string; path: string; exists: boolean }> =>
     ipcRenderer.invoke(IPC.glossaryGet, profile),
   glossarySave: (content: string, profile?: string | null): Promise<void> =>
     ipcRenderer.invoke(IPC.glossarySave, content, profile),

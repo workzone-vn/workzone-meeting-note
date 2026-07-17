@@ -262,7 +262,11 @@ export default function App(): React.JSX.Element {
                 onBack={pipeline.origin === 'process' ? () => setViewProgress(false) : undefined}
               />
             ) : (
-              <Home recorder={recorder} onOpenMeeting={openMeeting} />
+              <Home
+                recorder={recorder}
+                onOpenMeeting={openMeeting}
+                onOpenSettings={() => setTab('settings')}
+              />
             ))}
 
           {tab === 'meetings' &&

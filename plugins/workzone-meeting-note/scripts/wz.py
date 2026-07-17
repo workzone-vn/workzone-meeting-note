@@ -221,7 +221,7 @@ def _mic_index(devs=None):
     devs = devs or _list_audio()
     skip = ("blackhole", "aggregate", "iphone", "ipad")
     ok = [(i, n) for i, n in devs if not any(s in n.lower() for s in skip)]
-    # Lưu ý: tên Continuity theo TÊN RIÊNG của máy (vd "N Phone Microphone") nên
+    # Lưu ý: tên Continuity theo TÊN RIÊNG của máy (vd "iPhone cua Nam Microphone") nên
     # skip-list không bắt hết - ưu tiên built-in mới là lớp chặn chính.
     for idx, name in ok:
         if any(b in name.lower() for b in ("macbook", "built-in", "imac")):
