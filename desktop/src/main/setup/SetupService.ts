@@ -16,15 +16,24 @@ import {
   venvPython
 } from '../paths'
 
+const WIN = process.platform === 'win32'
+
 // Cùng pin version với install.sh - tránh bản upstream breaking.
-const PIP_PACKAGES = [
-  'mlx-whisper==0.4.3',
-  'soundfile==0.14.0',
-  'imageio-ffmpeg==0.6.0',
-  'mcp[cli]==1.28.0',
-  'torch==2.12.1',
-  'pyannote.audio>=3.1,<4'
-]
+// Windows: faster-whisper (CPU) + WASAPI loopback; không mlx/torch/pyannote
+// (mlx chỉ có Apple Silicon; diarization tắt trên Windows bản beta).
+const PIP_PACKAGES = WIN
+  ? ['faster-whisper==1.2.1', 'pyaudiowpatch==0.2.12.7', 'imageio-ffmpeg==0.6.0', 'mcp[cli]==1.28.0']
+  : [
+      'mlx-whisper==0.4.3',
+      'soundfile==0.14.0',
+      'imageio-ffmpeg==0.6.0',
+      'mcp[cli]==1.28.0',
+      'torch==2.12.1',
+      'pyannote.audio>=3.1,<4'
+    ]
+
+const PIP_PROBE = WIN ? 'import faster_whisper, pyaudiowpatch, imageio_ffmpeg' : 'import mlx_whisper, imageio_ffmpeg'
+const HF_MODEL = WIN ? 'Systran/faster-whisper-large-v3' : 'mlx-community/whisper-large-v3-mlx'
 
 type ProgressFn = (p: SetupProgress) => void
 let running = false
@@ -38,15 +47,23 @@ export function getSetupStatus(): SetupStatus {
     modelOk,
     engineSynced,
     claudePath: findClaude(),
-    syscapOk: syscapPath() !== null,
+    // Windows: loopback WASAPI nằm ngay trong engine, không cần binary riêng
+    syscapOk: WIN ? true : syscapPath() !== null,
     ready: venvOk && modelOk
   }
 }
 
 function sh(cmd: string, args: string[], onLine?: (l: string) => void): Promise<number> {
   return new Promise((resolve) => {
+    const extra = WIN
+      ? [path.join(process.env.USERPROFILE || '', '.local', 'bin')]
+      : [`${process.env.HOME}/.local/bin`, '/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin']
     const child = spawn(cmd, args, {
-      env: { ...process.env, PATH: `${process.env.HOME}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH || ''}` }
+      env: {
+        ...process.env,
+        PYTHONUTF8: '1', // pipe Windows mặc định cp1252 -> marker tiếng Việt vỡ
+        PATH: [...extra, process.env.PATH || ''].join(path.delimiter)
+      }
     })
     // tqdm ghi tiến trình bằng \r trên stderr -> tách theo \r lẫn \n
     let buf = ''
@@ -70,7 +87,15 @@ async function stepUv(progress: ProgressFn): Promise<string> {
     return existing
   }
   progress({ step: 'uv', status: 'running', message: 'Đang cài uv (trình quản lý Python)...' })
-  const code = await sh('bash', ['-c', 'curl -LsSf https://astral.sh/uv/install.sh | sh'])
+  const code = WIN
+    ? await sh('powershell', [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        'irm https://astral.sh/uv/install.ps1 | iex'
+      ])
+    : await sh('bash', ['-c', 'curl -LsSf https://astral.sh/uv/install.sh | sh'])
   const uv = findUv()
   if (code !== 0 || !uv) throw new Error('Không cài được uv. Kiểm tra kết nối mạng rồi thử lại.')
   progress({ step: 'uv', status: 'done' })
@@ -89,7 +114,7 @@ async function stepVenv(uv: string, progress: ProgressFn): Promise<void> {
 }
 
 async function stepPip(uv: string, progress: ProgressFn): Promise<void> {
-  const probe = await sh(venvPython, ['-c', 'import mlx_whisper, imageio_ffmpeg'])
+  const probe = await sh(venvPython, ['-c', PIP_PROBE])
   if (probe === 0) {
     progress({ step: 'pip', status: 'done' })
     return
@@ -110,7 +135,7 @@ async function stepModel(progress: ProgressFn): Promise<void> {
   progress({ step: 'model', status: 'running', message: 'Tải model Whisper large-v3 (~3GB, chỉ lần đầu)...' })
   const code = await sh(
     venvPython,
-    ['-u', '-c', 'from huggingface_hub import snapshot_download; snapshot_download("mlx-community/whisper-large-v3-mlx")'],
+    ['-u', '-c', `from huggingface_hub import snapshot_download; snapshot_download("${HF_MODEL}")`],
     (l) => {
       // Parse % từ tqdm; nếu format đổi thì bỏ qua (không được chặn cài đặt)
       const m = l.match(/(\d{1,3})%\|/)
@@ -134,7 +159,7 @@ export async function syncEngine(progress?: ProgressFn): Promise<void> {
   fs.mkdirSync(dst, { recursive: true })
   fs.mkdirSync(outputDir, { recursive: true })
   const src = engineDir()
-  for (const f of ['wz.py', 'render.py', 'glossary.yaml', 'server.py']) {
+  for (const f of ['wz.py', 'wz-win.py', 'render.py', 'glossary.yaml', 'server.py']) {
     const from = fs.existsSync(path.join(src, f))
       ? path.join(src, f)
       : path.resolve(src, '../../..', 'mcp', f) // dev: server.py nằm ở <repo>/mcp/

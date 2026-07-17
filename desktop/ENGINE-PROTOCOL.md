@@ -1,10 +1,14 @@
 # Giao thức App ↔ Engine
 
-App Electron nói chuyện với engine qua CLI `wz.py` (spawn bằng python của venv
-`~/wz-bien-ban/.venv`). Đây là **seam** cho Windows sau này: một `wz-win.py`
-(ghi WASAPI + faster-whisper/whisper.cpp) chỉ cần in đúng các marker dưới đây
-là toàn bộ UI/main-process dùng lại nguyên vẹn. Phần macOS-conditional duy nhất
-nằm ở `src/main/paths.ts`.
+App Electron nói chuyện với engine qua CLI (spawn bằng python của venv
+`~/wz-bien-ban/.venv`): macOS dùng `wz.py` (mlx-whisper + Core Audio tap),
+Windows dùng `wz-win.py` (BETA - faster-whisper + WASAPI loopback qua
+pyaudiowpatch; import wz.py và tái dùng mọi lệnh không phụ thuộc nền tảng,
+chỉ tự xử lý record/transcribe/devices/_alive/ffmpeg). Cả hai in cùng bộ
+marker dưới đây nên UI/main-process dùng chung. Platform-conditional nằm ở
+`src/main/paths.ts` (+ lệnh cài trong SetupService). Windows dừng ghi bằng
+file cờ `.stop` trong thư mục cuộc họp (không SIGINT được tiến trình detached);
+diarization tắt trên Windows bản beta.
 
 ## Lệnh app sử dụng
 

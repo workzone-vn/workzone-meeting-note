@@ -2,6 +2,7 @@
 // stream từng dòng stdout/stderr và parse các marker (OUTPUT_DIR=, WARN_SILENT...).
 import { spawn } from 'child_process'
 import * as fs from 'fs'
+import * as path from 'path'
 import * as readline from 'readline'
 import type { RecorderStatus } from '../../shared/types'
 import { dataDir, extraPath, stateFile, venvPython, wzScript } from '../paths'
@@ -16,7 +17,8 @@ export interface RunResult {
 function engineEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
-    PATH: [...extraPath(), process.env.PATH || ''].join(':')
+    PYTHONUTF8: '1', // pipe trên Windows mặc định cp1252 -> marker tiếng Việt vỡ
+    PATH: [...extraPath(), process.env.PATH || ''].join(path.delimiter)
   }
   const dev = getSettings().audioDeviceIndex
   if (dev !== null && dev !== '' && !process.env.WZ_AUDIO_DEV) {

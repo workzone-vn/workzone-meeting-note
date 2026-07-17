@@ -1,5 +1,13 @@
 # Electron Desktop App — tiến độ
 
+## RELEASE (2026-07-17): v0.12.1 lên GitHub Releases
+https://github.com/workzone-vn/workzone-meeting-note/releases/tag/v0.12.1
+- [x] Rà soát bundle: extraResources chỉ wz.py/render.py/glossary.yaml(generic)/server.py/wz-syscap/tray; mount DMG quét chuỗi riêng tư -> SẠCH; dữ liệu user nằm ngoài app (~/wz-bien-ban tạo trên từng máy, trống)
+- [x] Gợi ý khởi tạo ngữ cảnh: Home banner khi chưa có context.md ("Viết ngữ cảnh" -> Cài đặt / "Để sau" nhớ localStorage); glossaryGet trả exists; comment "N Phone" đổi generic
+- [x] Push main + tag v0.12.1, gh release create kèm DMG + SHA-256 + hướng dẫn xattr (app chưa ký)
+- [ ] WINDOWS: CHƯA build được bản chạy thật - engine hiện macOS-only (mlx-whisper cần Apple Silicon, ghi âm avfoundation, wz-syscap Core Audio tap). Cần dự án riêng: wz-win.py (WASAPI loopback + faster-whisper), seam đã để sẵn ở desktop/ENGINE-PROTOCOL.md + paths.ts. Đã ghi rõ trong release notes.
+- [ ] Ký + notarize DMG khi có Apple Developer ID (bớt cảnh báo Gatekeeper)
+
 ## TÍNH NĂNG (2026-07-17): Chat tạo Wiki từ cuộc họp + sửa tay title + tìm kiếm cuộc họp — v0.11.0
 Spec: `docs/superpowers/specs/2026-07-17-wiki-from-meeting-design.md`. Gồm 3 phần (2 phần sau user bổ sung giữa chừng):
 - [x] Trợ lý biên bản 2 chế độ pill [Sửa biên bản|Lưu Wiki]; engine `wiki-note <tên>` (stdin yêu cầu) -> Claude trả TITLE:/TAGS:/CONTENT: -> ghi file wiki cùng format WikiStore + footer nguồn cuộc họp, in NOTE_ID/NOTE_TITLE; IPC meetings:wikiNote

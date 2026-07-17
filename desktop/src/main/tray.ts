@@ -75,12 +75,23 @@ export function refreshTray(): void {
   // Title cập nhật mỗi giây; menu chỉ dựng lại khi trạng thái đổi
   // (setContextMenu liên tục sẽ đóng menu đang mở).
   // Ưu tiên đồng hồ ghi âm: có thể VỪA ghi cuộc mới VỪA xử lý nền cuộc cũ.
-  if (st.recording && st.startedAt) {
-    tray.setTitle(` ${fmtElapsed(Math.max(0, Date.now() / 1000 - st.startedAt))}`, {
-      fontType: 'monospacedDigit'
-    })
-  } else if (busy) tray.setTitle(' ⏳', { fontType: 'monospacedDigit' })
-  else tray.setTitle('')
+  // setTitle chỉ có trên macOS - Windows dùng tooltip thay.
+  if (process.platform === 'darwin') {
+    if (st.recording && st.startedAt) {
+      tray.setTitle(` ${fmtElapsed(Math.max(0, Date.now() / 1000 - st.startedAt))}`, {
+        fontType: 'monospacedDigit'
+      })
+    } else if (busy) tray.setTitle(' ⏳', { fontType: 'monospacedDigit' })
+    else tray.setTitle('')
+  } else {
+    tray.setToolTip(
+      st.recording && st.startedAt
+        ? `Claude Recorder - đang ghi ${fmtElapsed(Math.max(0, Date.now() / 1000 - st.startedAt))}`
+        : busy
+          ? 'Claude Recorder - đang xử lý biên bản'
+          : 'Claude Recorder'
+    )
+  }
   const key = `${st.recording}|${busy}`
   if (key !== lastMenuKey) {
     lastMenuKey = key

@@ -13,15 +13,17 @@ extraResources:
     to: engine
     filter:
       - wz.py
+      - wz-win.py
       - render.py
       - glossary.yaml
   - from: ../mcp/server.py
     to: engine/server.py
-  - from: ../native/wz-syscap
-    to: engine/wz-syscap
   - from: build/tray
     to: tray
 mac:
+  extraResources:
+    - from: ../native/wz-syscap
+      to: engine/wz-syscap
   target:
     - target: dmg
       arch:
@@ -40,3 +42,15 @@ mac:
     NSAudioCaptureUsageDescription: Cần quyền ghi âm thanh hệ thống để thu tiếng người khác trong cuộc họp online (không quay màn hình).
 dmg:
   title: Claude Recorder
+# Windows BETA: NSIS x64. Icon tự convert từ build/icon.png (512px).
+# Engine dùng wz-win.py (WASAPI loopback + faster-whisper) - xem ENGINE-PROTOCOL.md.
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.png
+nsis:
+  oneClick: true
+  deleteAppDataOnUninstall: false
+  artifactName: ${productName}-${version}-win-x64.${ext}
