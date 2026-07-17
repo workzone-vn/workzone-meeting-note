@@ -1,0 +1,28 @@
+{
+  "name": "workzone-meeting-note-desktop",
+  "version": "0.12.0",
+  "description": "Claude Recorder - app desktop (Electron). Ghi âm họp, transcript local, biên bản bằng Claude Code.",
+  "main": "./out/main/index.js",
+  "author": "Claude Recorder",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "typecheck": "tsc --noEmit",
+    "build": "electron-vite build",
+    "dist:mac": "electron-vite build && electron-builder --mac dmg --arm64",
+    "dist:mac:unsigned": "CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:mac"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.5.0",
+    "electron": "^37.0.0",
+    "electron-builder": "^26.0.0",
+    "electron-vite": "^4.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.8.0"
+  }
+}

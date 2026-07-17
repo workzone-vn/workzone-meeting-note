@@ -1,0 +1,27 @@
+<!-- Nguồn icon desktop app (mic + sóng âm, brand navy Work Zone).
+     Render lại: mở trong Chrome/Electron 1024x1024 nền trong suốt -> PNG ->
+     iconset (16..1024) -> iconutil -c icns -> build/icon.icns -->
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f7fd1"/>
+      <stop offset="1" stop-color="#1c3d6e"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="0.28" cy="0.18" r="0.9">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="0.55" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="mic" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dfe9f8"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#sheen)"/>
+  <path d="M 316 361 A 112 112 0 0 0 316 509" fill="none" stroke="#aecbf0" stroke-width="30" stroke-linecap="round" opacity="0.9"/>
+  <path d="M 708 361 A 112 112 0 0 1 708 509" fill="none" stroke="#aecbf0" stroke-width="30" stroke-linecap="round" opacity="0.9"/>
+  <rect x="417" y="262" width="190" height="330" rx="95" fill="url(#mic)"/>
+  <path d="M 352 496 A 160 160 0 0 0 672 496" fill="none" stroke="#ffffff" stroke-width="46" stroke-linecap="round"/>
+  <line x1="512" y1="656" x2="512" y2="736" stroke="#ffffff" stroke-width="46" stroke-linecap="round"/>
+  <line x1="408" y1="762" x2="616" y2="762" stroke="#ffffff" stroke-width="46" stroke-linecap="round"/>
+</svg>

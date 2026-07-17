@@ -1,0 +1,1386 @@
+/* Token màu brand - lấy từ render.py (viewer/print) để 3 mặt đồng bộ. */
+:root {
+  --navy: #1c3d6e;
+  --navy-2: #244e8a;
+  --azure: #2f7fd1;
+  --azure-soft: #eaf2fc;
+  --ground: #f6f8fc;
+  --surface: #fff;
+  --text: #26303f;
+  --muted: #6b7c91;
+  --border: #e2e9f3;
+  --ts: #3a6fb0;
+  --red: #d64545;
+  --red-soft: #fdeaea;
+  --green: #2e9e5b;
+  --amber-soft: #fff7e0;
+  --amber-border: #f0d98c;
+  --amber-text: #7a5d00;
+  color-scheme: light;
+}
+
+/* ---------- Chế độ tối ---------- */
+/* Bảng màu tối: nền app rất tối (--ground), panel sáng hơn (--surface),
+ * chữ sáng (--text), các màu soft/nhấn được nhuộm tối để banner/chip vẫn rõ.
+ * --navy chuyển sang xanh sáng để làm màu tiêu đề trên nền tối; sidebar/hero
+ * và các nền navy (header bảng, chip đang chọn) được ghim navy riêng bên dưới. */
+:root[data-theme='dark'] {
+  --navy: #7fb2ec; /* tiêu đề / nhấn xanh trên nền tối */
+  --navy-2: #9cc4f2; /* chỉ dùng cho gradient sidebar/hero (đã ghim navy) */
+  --azure: #4a95e0;
+  --azure-soft: #1c2c42; /* "xanh nhạt" -> xanh đậm trong tối (chip, hover, focus) */
+  --ground: #0f1520; /* nền app */
+  --surface: #182231; /* thẻ / panel sáng hơn nền */
+  --text: #e4ebf5;
+  --muted: #93a4bb;
+  --border: #2b3648;
+  --ts: #7fb2ec;
+  --red: #e0605f;
+  --red-soft: #3a2224; /* nền banner lỗi tối */
+  --green: #35b06a;
+  --amber-soft: #37301c; /* nền banner cảnh báo tối */
+  --amber-border: #6a5a2a;
+  --amber-text: #f0d98c; /* chữ vàng sáng trên banner tối */
+  color-scheme: dark;
+}
+
+/* Sidebar & hero luôn giữ navy ở cả 2 chế độ (không đổi theo --navy đã ghi đè) */
+:root[data-theme='dark'] .sidebar {
+  background: linear-gradient(180deg, #1c3d6e, #244e8a);
+}
+
+:root[data-theme='dark'] .onboard .hero {
+  background: linear-gradient(135deg, #1c3d6e, #244e8a);
+}
+
+/* Header bảng & chip hồ sơ đang chọn: nền navy để chữ trắng đọc rõ */
+:root[data-theme='dark'] .doc th,
+:root[data-theme='dark'] .profile-chip.active {
+  background: #24406f;
+}
+
+:root[data-theme='dark'] .profile-chip.active {
+  border-color: #24406f;
+}
+
+/* Các hex sáng cứng còn lại -> biến thể hợp nền tối */
+:root[data-theme='dark'] .banner.error,
+:root[data-theme='dark'] .danger-hover:hover {
+  border-color: #6e3636;
+  color: #f0b3b3;
+}
+
+:root[data-theme='dark'] .badge.on,
+:root[data-theme='dark'] .profile-tag {
+  border-color: #2f5580;
+}
+
+:root[data-theme='dark'] .line mark {
+  background: #b8912a;
+  color: #1a1400;
+}
+
+:root[data-theme='dark'] .doc tbody tr:nth-child(even) {
+  background: #1e2a3b;
+}
+
+:root[data-theme='dark'] .doc code {
+  background: #24304a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--ground);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  line-height: 1.6;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+button {
+  font: inherit;
+}
+
+/* ---------- Icon duotone (components/icons.tsx) ---------- */
+/* Canh icon giữa cạnh chữ trong nav-item/nút/chip; icon không co giãn theo flex.
+ * Màu theo `currentColor` -> tự đổi theo ngữ cảnh & giao diện Sáng/Tối, không màu cứng. */
+.icon {
+  display: inline-flex;
+  vertical-align: middle;
+  flex: none;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* ---------- Khung app: sidebar + nội dung ---------- */
+.app {
+  display: grid;
+  grid-template-columns: 224px 1fr;
+  height: 100%;
+}
+
+.sidebar {
+  background: linear-gradient(180deg, var(--navy), var(--navy-2));
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 12px;
+  -webkit-app-region: drag; /* kéo cửa sổ bằng sidebar (titleBar ẩn) */
+}
+
+.sidebar .brand {
+  padding: 34px 10px 20px; /* chừa chỗ nút traffic-light */
+}
+
+.sidebar .brand .eyebrow {
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #aecbf0;
+  font-weight: 600;
+}
+
+.sidebar .brand .name {
+  font-size: 1.12rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.nav-item {
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  background: none;
+  color: #cdddf3;
+  padding: 10px 12px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-weight: 600;
+  text-align: left;
+  margin-bottom: 2px;
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.nav-item.active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.nav-item .dot {
+  margin-left: auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  animation: pulse 1.6s infinite;
+}
+
+/* nút đổi Sáng/Tối - đẩy xuống đáy sidebar, ngay trên dòng version */
+.theme-toggle {
+  margin-top: auto;
+}
+
+.sidebar .foot {
+  padding: 10px 12px;
+  font-size: 0.72rem;
+  color: #8fb0da;
+}
+
+.content {
+  overflow-y: auto;
+  height: 100%;
+  padding: 28px 36px 60px;
+}
+
+.content-inner {
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+h1.page-title {
+  font-size: 1.5rem;
+  color: var(--navy);
+  margin: 6px 0 18px;
+}
+
+/* ---------- Thẻ, nút, banner dùng chung ---------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px 24px;
+  margin-bottom: 16px;
+}
+
+.btn {
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--navy);
+  border-radius: 10px;
+  padding: 9px 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--azure-soft);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn.primary {
+  background: var(--azure);
+  border-color: var(--azure);
+  color: #fff;
+}
+
+.btn.primary:hover {
+  background: #2a72bc;
+}
+
+.btn.danger {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+
+.btn.danger:hover {
+  background: #c03a3a;
+}
+
+.banner {
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 0.92rem;
+}
+
+.banner.warn {
+  background: var(--amber-soft);
+  border: 1px solid var(--amber-border);
+  color: var(--amber-text);
+}
+
+.banner.error {
+  background: var(--red-soft);
+  border: 1px solid #f2c3c3;
+  color: #8c2b2b;
+}
+
+.banner .banner-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+code.cmd {
+  display: block;
+  background: #14213a;
+  color: #d5e6fb;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.84rem;
+  margin: 6px 0;
+  user-select: text;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* ---------- Màn hình Ghi âm ---------- */
+.record-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 44px 20px 36px;
+  text-align: center;
+}
+
+.record-btn {
+  width: 148px;
+  height: 148px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  color: #fff;
+  font-size: 1.02rem;
+  font-weight: 700;
+  background: radial-gradient(circle at 32% 28%, #3c8ede, var(--azure) 55%, #2668ab);
+  box-shadow: 0 12px 30px rgba(47, 127, 209, 0.35);
+  transition: transform 0.12s ease;
+}
+
+.record-btn:hover {
+  transform: scale(1.04);
+}
+
+.record-btn.recording {
+  background: radial-gradient(circle at 32% 28%, #e46a6a, var(--red) 55%, #b23030);
+  box-shadow: 0 12px 30px rgba(214, 69, 69, 0.4);
+  animation: pulse 1.8s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(214, 69, 69, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 22px rgba(214, 69, 69, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(214, 69, 69, 0);
+  }
+}
+
+.timer {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 2.2rem;
+  color: var(--navy);
+  margin: 18px 0 2px;
+}
+
+.rec-meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.name-input {
+  width: min(420px, 100%);
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 26px;
+  background: var(--surface);
+  user-select: text;
+}
+
+.name-input:focus {
+  outline: none;
+  border-color: var(--azure);
+  box-shadow: 0 0 0 3px var(--azure-soft);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 4px 12px;
+  margin-top: 20px;
+}
+
+.chip b {
+  color: var(--navy);
+}
+
+/* ---------- Processing ---------- */
+.stage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.stage-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 13px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.stage-list li:last-child {
+  border-bottom: none;
+}
+
+.stage-ico {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  flex: none;
+  margin-top: 2px;
+  background: var(--ground);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.stage-ico.done {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+.stage-ico.error {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+
+.stage-ico.running {
+  border-color: var(--azure);
+  color: var(--azure);
+}
+
+.spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--azure-soft);
+  border-top-color: var(--azure);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.stage-title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.stage-sub {
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+/* ---------- Danh sách cuộc họp ---------- */
+.meeting-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 15px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.meeting-row:hover {
+  border-color: var(--azure);
+  background: var(--azure-soft);
+}
+
+.meeting-row .m-name {
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.meeting-row .m-meta {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.badges {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+.badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 2px 10px;
+  background: var(--ground);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.badge.on {
+  background: var(--azure-soft);
+  color: var(--azure);
+  border-color: #bcd7f2;
+}
+
+/* ---------- Chi tiết cuộc họp ---------- */
+.detail-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 18px;
+}
+
+.tab {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 11px 16px 9px;
+  color: var(--muted);
+  font-weight: 600;
+  border-bottom: 2.5px solid transparent;
+}
+
+.tab:hover {
+  color: var(--navy);
+}
+
+.tab.active {
+  color: var(--navy);
+  border-bottom-color: var(--azure);
+}
+
+.searchbar {
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.searchbar input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  user-select: text;
+}
+
+.searchbar input:focus {
+  outline: none;
+  border-color: var(--azure);
+  box-shadow: 0 0 0 3px var(--azure-soft);
+}
+
+.count {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin: 0 0 12px 2px;
+}
+
+.line {
+  display: grid;
+  grid-template-columns: 62px 1fr;
+  gap: 14px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  user-select: text;
+}
+
+.line:hover {
+  background: var(--azure-soft);
+}
+
+.line .ts {
+  color: var(--ts);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.82rem;
+  font-family: ui-monospace, Menlo, monospace;
+  padding-top: 3px;
+}
+
+.line mark {
+  background: #fde68a;
+  border-radius: 2px;
+}
+
+/* ---------- Biên bản (doc) - style từ viewer.html ---------- */
+.doc {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 30px 34px;
+  user-select: text;
+}
+
+.doc h1 {
+  font-size: 1.5rem;
+  color: var(--navy);
+  margin: 0.2em 0 0.5em;
+}
+
+.doc h2 {
+  font-size: 1.18rem;
+  color: var(--navy);
+  margin: 1.5em 0 0.5em;
+  padding-top: 0.3em;
+  border-top: 1px solid var(--border);
+}
+
+.doc h2:first-of-type {
+  border-top: none;
+}
+
+.doc h3 {
+  font-size: 1.02rem;
+  color: var(--azure);
+  margin: 1.3em 0 0.4em;
+}
+
+.doc ul,
+.doc ol {
+  padding-left: 1.4em;
+}
+
+.doc blockquote {
+  margin: 1em 0;
+  padding: 12px 16px;
+  background: var(--azure-soft);
+  border-left: 3px solid var(--azure);
+  border-radius: 0 8px 8px 0;
+}
+
+.doc .tbl-wrap {
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.doc table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.92rem;
+  min-width: 480px;
+}
+
+.doc th {
+  background: var(--navy);
+  color: #fff;
+  text-align: left;
+  padding: 9px 12px;
+}
+
+.doc td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.doc tbody tr:nth-child(even) {
+  background: #fafbfe;
+}
+
+.doc code {
+  background: #eef1f6;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+/* ---------- Onboarding ---------- */
+.onboard {
+  max-width: 620px;
+  margin: 0 auto;
+  padding-top: 30px;
+}
+
+.onboard .hero {
+  background: linear-gradient(135deg, var(--navy), var(--navy-2));
+  color: #fff;
+  border-radius: 18px;
+  padding: 34px 36px;
+  margin-bottom: 20px;
+}
+
+.onboard .hero h1 {
+  margin: 6px 0 8px;
+  font-size: 1.6rem;
+}
+
+.onboard .hero p {
+  color: #cdddf3;
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--ground);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--azure);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.progress-fill.indeterminate {
+  width: 35% !important;
+  animation: slide 1.4s ease-in-out infinite;
+}
+
+@keyframes slide {
+  0% {
+    margin-left: -35%;
+  }
+  100% {
+    margin-left: 100%;
+  }
+}
+
+/* ---------- Settings ---------- */
+.field {
+  margin-bottom: 18px;
+}
+
+.field .label {
+  font-weight: 600;
+  color: var(--navy);
+  margin-bottom: 4px;
+}
+
+.field .hint {
+  font-size: 0.84rem;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.field select,
+.field input[type='text'],
+.field input[type='password'] {
+  width: min(420px, 100%);
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  user-select: text;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.check-detail {
+  white-space: pre-wrap;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.82rem;
+  background: var(--ground);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 12px;
+  user-select: text;
+}
+
+.empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 60px 0;
+}
+
+.md-editor {
+  width: 100%;
+  min-height: 480px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 16px 18px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  user-select: text;
+}
+
+.md-editor:focus {
+  outline: none;
+  border-color: var(--azure);
+  box-shadow: 0 0 0 3px var(--azure-soft);
+}
+
+.icon-btn {
+  padding: 6px 10px;
+  flex: none;
+}
+
+.glossary-editor {
+  min-height: 220px;
+  margin-top: 8px;
+  /* hồ sơ ngữ cảnh là văn xuôi tự do -> font thường, không monospace */
+  font-family: inherit;
+  font-size: 0.92rem;
+}
+
+.path-link {
+  display: inline-block;
+  border: none;
+  background: none;
+  padding: 2px 0;
+  cursor: pointer;
+  color: var(--azure);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.8rem;
+  text-align: left;
+  word-break: break-all;
+}
+
+.path-link:hover {
+  text-decoration: underline;
+}
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  justify-content: center;
+}
+
+.profile-label {
+  font-size: 0.84rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.profile-chip {
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 5px 15px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.profile-chip:hover {
+  border-color: var(--azure);
+  color: var(--navy);
+}
+
+.profile-chip.active {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+}
+
+.profile-new-input {
+  border: 1px dashed var(--border);
+  background: none;
+  border-radius: 999px;
+  padding: 5px 15px;
+  font-size: 0.86rem;
+  width: 150px;
+  user-select: text;
+}
+
+.profile-new-input:focus {
+  outline: none;
+  border-color: var(--azure);
+}
+
+.profile-tag {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--navy);
+  background: var(--azure-soft);
+  border: 1px solid #bcd7f2;
+  border-radius: 999px;
+  padding: 1px 9px;
+  vertical-align: 2px;
+}
+
+/* thẻ "Cá nhân" nhạt hơn để thẻ công ty nổi bật */
+.profile-tag.personal {
+  color: var(--muted);
+  background: var(--ground);
+  border-color: var(--border);
+}
+
+.danger-hover:hover {
+  background: var(--red-soft);
+  border-color: #f2c3c3;
+  color: #8c2b2b;
+}
+
+/* ---------- Panel "Việc cần làm" trong chi tiết cuộc họp ---------- */
+.task-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.task-suggest {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px solid var(--border);
+}
+
+.task-suggest-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-suggest-meta {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.task-suggest .btn {
+  flex: none;
+  padding: 6px 12px;
+  font-size: 0.86rem;
+}
+
+/* ---------- Trang Tasks ---------- */
+/* Toggle "Đang làm" / "Lưu trữ" ở đầu trang */
+.task-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.task-table {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.task-table-head,
+.task-row {
+  display: grid;
+  grid-template-columns: 30px 1fr minmax(110px, 170px) minmax(90px, 130px) 120px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+}
+
+.task-table-head {
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: var(--ground);
+  border-bottom: 1px solid var(--border);
+}
+
+.task-row {
+  border-bottom: 1px solid var(--border);
+}
+
+.task-check {
+  width: 17px;
+  height: 17px;
+  cursor: pointer;
+  accent-color: var(--azure);
+}
+
+.task-name-cell {
+  min-width: 0;
+}
+
+.task-input {
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 6px 4px;
+  border-radius: 6px;
+  user-select: text;
+}
+
+.task-input:focus {
+  outline: none;
+  background: var(--azure-soft);
+}
+
+.task-row.done .task-input,
+.task-row.done .task-source {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.task-source {
+  display: inline-block;
+  margin: 2px 0 0 4px;
+  border: 1px solid var(--border);
+  background: var(--ground);
+  color: var(--azure);
+  border-radius: 999px;
+  padding: 1px 10px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-source:hover {
+  border-color: var(--azure);
+  background: var(--azure-soft);
+}
+
+/* Ô chứa các nút thao tác cuối mỗi dòng (lưu trữ/khôi phục + xoá) */
+.task-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+/* Nút Lưu trữ / Khôi phục (dạng chip nhạt) */
+.task-act {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.task-act:hover {
+  border-color: var(--azure);
+  background: var(--azure-soft);
+  color: var(--navy);
+}
+
+.task-del {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  opacity: 0;
+  font-size: 0.9rem;
+}
+
+.task-row:hover .task-del {
+  opacity: 0.75;
+}
+
+.task-del:hover {
+  opacity: 1;
+  background: var(--red-soft);
+}
+
+.task-add-btn {
+  border: none;
+  background: none;
+  color: var(--azure);
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  justify-self: center;
+}
+
+.task-add-row {
+  display: block;
+  width: 100%;
+  border: none;
+  background: none;
+  text-align: left;
+  padding: 11px 16px;
+  color: var(--muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.task-add-row:hover {
+  background: var(--azure-soft);
+  color: var(--navy);
+}
+
+/* ---------- Trợ lý biên bản (chat AI sửa nội dung - ReviseChat.tsx) ---------- */
+/* Nút tròn + popover ghim theo viewport (content là vùng cuộn), luôn ở góc dưới-phải. */
+.revise-fab {
+  position: fixed;
+  right: 26px;
+  bottom: 26px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  /* ghim navy brand ở cả 2 chế độ (như sidebar), không theo --navy bị override khi tối */
+  background: linear-gradient(135deg, #1c3d6e, #2f7fd1);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(16, 34, 60, 0.35);
+  z-index: 60;
+}
+
+.revise-fab:hover {
+  filter: brightness(1.12);
+}
+
+.revise-fab.open {
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.revise-pop {
+  position: fixed;
+  right: 26px;
+  bottom: 90px;
+  width: 370px;
+  max-width: calc(100vw - 52px);
+  max-height: min(500px, calc(100vh - 130px));
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 14px 44px rgba(10, 22, 40, 0.35);
+  z-index: 60;
+  overflow: hidden;
+}
+
+.revise-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.revise-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+  color: var(--navy);
+  font-size: 0.95rem;
+}
+
+.revise-close {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.revise-close:hover {
+  background: var(--azure-soft);
+  color: var(--navy);
+}
+
+.revise-msgs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 120px;
+}
+
+.revise-empty {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.revise-msg {
+  max-width: 86%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+.revise-msg.user {
+  align-self: flex-end;
+  /* ghim navy brand như .revise-fab để chữ trắng rõ ở cả 2 chế độ */
+  background: linear-gradient(135deg, #1c3d6e, #244e8a);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.revise-msg.ai {
+  align-self: flex-start;
+  background: var(--azure-soft);
+  color: var(--text);
+  border-bottom-left-radius: 4px;
+}
+
+.revise-msg.ai.error {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.revise-working {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.revise-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 0 14px 8px;
+}
+
+.revise-chip {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--navy);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.revise-chip:hover:not(:disabled) {
+  background: var(--azure-soft);
+  border-color: var(--azure);
+}
+
+.revise-chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.revise-inputrow {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.revise-input {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 0.9rem;
+  background: var(--ground);
+  color: var(--text);
+  outline: none;
+}
+
+.revise-input:focus {
+  border-color: var(--azure);
+}
+
+.revise-send {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #1c3d6e, #2f7fd1);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.revise-send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.revise-send .spinner {
+  border-color: rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+}
+
+/* ---------- Wiki (ghi chú + wikilink + graph) ---------- */
+.wikilink {
+  color: var(--azure);
+  cursor: pointer;
+  text-decoration: none;
+  border-bottom: 1px dashed var(--azure);
+}
+
+.wikilink:hover {
+  background: var(--azure-soft);
+}
+
+.wikilink.missing {
+  color: var(--muted);
+  border-bottom-color: var(--muted);
+  opacity: 0.75;
+}
+
+.wiki-graph {
+  width: 100%;
+  height: min(560px, calc(100vh - 190px));
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.wiki-ask .wiki-answer {
+  padding: 4px 0 0;
+  user-select: text;
+}
+
+/* Pill chọn chế độ trong Trợ lý biên bản (Sửa biên bản | Lưu Wiki) */
+.revise-chip.mode.active {
+  background: linear-gradient(135deg, #1c3d6e, #2f7fd1);
+  border-color: transparent;
+  color: #fff;
+}

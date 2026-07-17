@@ -1,0 +1,42 @@
+# Đóng gói macOS (arm64). appId KHÁC app rumps cũ (vn.workzone.meetingnote)
+# để không kế thừa quyền TCC mic/screen-recording cũ (denial cũ sẽ âm thầm phá ghi âm).
+appId: vn.workzone.meetingnote.desktop
+productName: Claude Recorder
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**
+asar: true
+extraResources:
+  - from: ../plugins/workzone-meeting-note/scripts
+    to: engine
+    filter:
+      - wz.py
+      - render.py
+      - glossary.yaml
+  - from: ../mcp/server.py
+    to: engine/server.py
+  - from: ../native/wz-syscap
+    to: engine/wz-syscap
+  - from: build/tray
+    to: tray
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+  category: public.app-category.productivity
+  icon: build/icon.icns
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.inherit.plist
+  extendInfo:
+    CFBundleDisplayName: Claude Recorder
+    NSMicrophoneUsageDescription: Claude Recorder cần micro để ghi âm cuộc họp.
+    # Core Audio Process Tap (wz-syscap): chỉ cần quyền "Ghi âm thanh hệ thống",
+    # KHÔNG xin quyền Ghi màn hình -> không chỉ báo tím / cảnh báo iPhone Mirroring.
+    NSAudioCaptureUsageDescription: Cần quyền ghi âm thanh hệ thống để thu tiếng người khác trong cuộc họp online (không quay màn hình).
+dmg:
+  title: Claude Recorder
