@@ -35,7 +35,13 @@ import {
   setMeetingTitle,
   type FindReplacePair
 } from './meetings'
-import { PERSONAL_PROFILE, createProfile, listProfiles, profileGlossaryFile } from './profiles'
+import {
+  PERSONAL_PROFILE,
+  createProfile,
+  listProfiles,
+  profileGlossaryFile,
+  renameProfile
+} from './profiles'
 import {
   createNote,
   deleteNote,
@@ -296,6 +302,9 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.profilesList, () => listProfiles())
   ipcMain.handle(IPC.profilesCreate, (_e, name: string) => createProfile(name))
+  ipcMain.handle(IPC.profilesRename, (_e, oldName: string, newName: string) =>
+    renameProfile(oldName, newName)
+  )
 
   // ---------- Wiki (ghi chú markdown + wikilink + tag) ----------
   ipcMain.handle(IPC.wikiList, () => listNotes())

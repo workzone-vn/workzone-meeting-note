@@ -1,5 +1,16 @@
 # Electron Desktop App — tiến độ
 
+## RELEASE (2026-07-17): v0.13.0 macOS + WINDOWS BETA
+Spec: `docs/superpowers/specs/2026-07-17-windows-beta-design.md`. User yêu cầu build Windows không có máy test -> phát hành BETA ghi rõ trong notes. https://github.com/workzone-vn/workzone-meeting-note/releases/tag/v0.13.0
+- [x] Engine `wz-win.py`: import wz.py + monkeypatch 3 điểm (_alive dùng OpenProcess - os.kill(pid,0) trên win là CTRL_C_EVENT; _transcribe = faster-whisper CPU int8 cùng format; ensure_ffmpeg = copy imageio binary vào DATA/bin, không symlink); ghi âm pyaudiowpatch mic + WASAPI loopback, recorder detached, DỪNG bằng file cờ .stop; stdout utf-8
+- [x] Desktop nhánh win32: paths (Scripts/python.exe, wz-win.py, findCli .exe/.cmd, model Systran), SetupService (uv PowerShell, pip faster-whisper+pyaudiowpatch, syscapOk=true), EngineService PYTHONUTF8+delimiter, tray tooltip thay setTitle, electron-builder win nsis x64 (build được ngay trên macOS, không cần Docker/wine), syscap chỉ bundle mac
+- [x] Test được trên máy này: transcribe + import-file + list/status qua wz-win với faster-whisper THẬT (venv riêng, model tiny) - format khớp 100%; nhánh copy-ffmpeg; typecheck; quét exe bundle sạch dữ liệu riêng
+- [x] KHÔNG test được (ghi rõ BETA): ghi âm WASAPI thật, installer trên máy Windows thật
+- [ ] Thu phản hồi user Windows đầu tiên; sửa theo _record.log họ gửi
+
+## LANDING (2026-07-17): hoc.ai.vn/claude-recorder (repo hoc-ai-vn)
+Trang giới thiệu "sản phẩm của học viên" giọng review theo copy user đưa: hero + nút tải macOS/Windows (GitHub Releases), 6 điểm hay, khối bảo mật local-first, hướng dẫn cài 2 nền tảng, CTA khoá học, disclaimer Anthropic. Build pass (route static). ĐÃ COMMIT trong repo hoc-ai-vn nhưng CHƯA push/deploy (deploy VPS có quy trình riêng - chờ user).
+
 ## RELEASE (2026-07-17): v0.12.1 lên GitHub Releases
 https://github.com/workzone-vn/workzone-meeting-note/releases/tag/v0.12.1
 - [x] Rà soát bundle: extraResources chỉ wz.py/render.py/glossary.yaml(generic)/server.py/wz-syscap/tray; mount DMG quét chuỗi riêng tư -> SẠCH; dữ liệu user nằm ngoài app (~/wz-bien-ban tạo trên từng máy, trống)

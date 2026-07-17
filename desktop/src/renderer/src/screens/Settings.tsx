@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { AudioDevice, EngineCheck, Settings as S, SetupStatus } from '../../../shared/types'
 import { ClaudeGuide } from '../components/ClaudeGuide'
-import { CheckCircle, FolderOpen, Lock, Warning } from '../components/icons'
+import { CheckCircle, FolderOpen, Lock, PencilSimple, Warning } from '../components/icons'
 
 export function Settings({
   setup,
@@ -20,6 +20,7 @@ export function Settings({
   const [profiles, setProfiles] = useState<string[]>([])
   const [glossaryTab, setGlossaryTab] = useState<string>('Cá nhân')
   const [newProfile, setNewProfile] = useState('')
+  const [renameDraft, setRenameDraft] = useState<string | null>(null) // null = không đổi tên
 
   useEffect(() => {
     void window.wz.settingsGet().then((s) => {
@@ -122,30 +123,67 @@ export function Settings({
               <button
                 key={p}
                 className={`profile-chip ${glossaryTab === p ? 'active' : ''}`}
-                onClick={() => setGlossaryTab(p)}
+                onClick={() => {
+                  setGlossaryTab(p)
+                  setRenameDraft(null)
+                }}
               >
                 {p}
               </button>
             ))}
-            <input
-              className="profile-new-input"
-              placeholder="+ Thêm công ty..."
-              value={newProfile}
-              onChange={(e) => setNewProfile(e.target.value)}
-              onKeyDown={async (e) => {
-                if (e.key !== 'Enter' || !newProfile.trim()) return
-                try {
-                  const slug = await window.wz.profilesCreate(newProfile.trim())
-                  setNewProfile('')
-                  const list = await window.wz.profilesList()
-                  setProfiles(list)
-                  setGlossaryTab(slug)
-                } catch (err) {
-                  setSavedNote(String(err instanceof Error ? err.message : err))
-                  setTimeout(() => setSavedNote(null), 3000)
-                }
-              }}
-            />
+            {glossaryTab !== 'Cá nhân' && renameDraft === null && (
+              <button
+                className="btn icon-btn"
+                title={`Đổi tên ngữ cảnh "${glossaryTab}" (các cuộc họp cũ tự cập nhật theo tên mới)`}
+                onClick={() => setRenameDraft(glossaryTab)}
+              >
+                <PencilSimple size={14} />
+              </button>
+            )}
+            {renameDraft !== null ? (
+              <input
+                className="profile-new-input"
+                autoFocus
+                value={renameDraft}
+                placeholder="Tên mới... (Enter lưu, Esc huỷ)"
+                onChange={(e) => setRenameDraft(e.target.value)}
+                onKeyDown={async (e) => {
+                  if (e.key === 'Escape') setRenameDraft(null)
+                  if (e.key !== 'Enter' || !renameDraft.trim()) return
+                  try {
+                    const to = await window.wz.profilesRename(glossaryTab, renameDraft.trim())
+                    setRenameDraft(null)
+                    setProfiles(await window.wz.profilesList())
+                    setGlossaryTab(to)
+                    setSavedNote(`Đã đổi tên ngữ cảnh thành "${to}".`)
+                    setTimeout(() => setSavedNote(null), 2500)
+                  } catch (err) {
+                    setSavedNote(String(err instanceof Error ? err.message : err))
+                    setTimeout(() => setSavedNote(null), 3000)
+                  }
+                }}
+              />
+            ) : (
+              <input
+                className="profile-new-input"
+                placeholder="+ Thêm ngữ cảnh..."
+                value={newProfile}
+                onChange={(e) => setNewProfile(e.target.value)}
+                onKeyDown={async (e) => {
+                  if (e.key !== 'Enter' || !newProfile.trim()) return
+                  try {
+                    const slug = await window.wz.profilesCreate(newProfile.trim())
+                    setNewProfile('')
+                    const list = await window.wz.profilesList()
+                    setProfiles(list)
+                    setGlossaryTab(slug)
+                  } catch (err) {
+                    setSavedNote(String(err instanceof Error ? err.message : err))
+                    setTimeout(() => setSavedNote(null), 3000)
+                  }
+                }}
+              />
+            )}
           </div>
           {glossary && (
             <>

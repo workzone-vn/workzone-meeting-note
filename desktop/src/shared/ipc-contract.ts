@@ -41,6 +41,7 @@ export const IPC = {
   glossaryReveal: 'glossary:reveal',
   profilesList: 'profiles:list',
   profilesCreate: 'profiles:create',
+  profilesRename: 'profiles:rename',
   tasksList: 'tasks:list',
   tasksCreate: 'tasks:create',
   tasksCreateMany: 'tasks:createMany',

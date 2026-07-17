@@ -98,6 +98,8 @@ export const wzApi = {
     ipcRenderer.invoke(IPC.glossaryReveal, profile),
   profilesList: (): Promise<string[]> => ipcRenderer.invoke(IPC.profilesList),
   profilesCreate: (name: string): Promise<string> => ipcRenderer.invoke(IPC.profilesCreate, name),
+  profilesRename: (oldName: string, newName: string): Promise<string> =>
+    ipcRenderer.invoke(IPC.profilesRename, oldName, newName),
   tasksList: (): Promise<Task[]> => ipcRenderer.invoke(IPC.tasksList),
   tasksCreate: (input: TaskInput): Promise<Task> => ipcRenderer.invoke(IPC.tasksCreate, input),
   tasksCreateMany: (inputs: TaskInput[]): Promise<Task[]> =>
