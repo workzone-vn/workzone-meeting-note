@@ -1,57 +1,100 @@
-// wz-syscap - bắt TIẾNG HỆ THỐNG (system audio) bằng ScreenCaptureKit, ghi ra WAV.
-// Không cần BlackHole. Chỉ cần quyền "Ghi màn hình & âm thanh" 1 lần.
+// wz-syscap - bắt TIẾNG HỆ THỐNG (system audio) bằng Core Audio Process Tap
+// (macOS 14.2+), ghi ra WAV. KHÔNG dùng ScreenCaptureKit -> không cần quyền
+// "Ghi màn hình", không bật chỉ báo tím, không làm iPhone Mirroring cảnh báo.
+// Quyền TCC: "System Audio Recording Only" (NSAudioCaptureUsageDescription) - hỏi 1 lần.
 //   wz-syscap <đường-dẫn-output.wav>
 //   Dừng: gửi SIGINT (Ctrl+C / kill -INT)
-import ScreenCaptureKit
+import AudioToolbox
 import AVFoundation
+import CoreAudio
 import Foundation
 
-extension CMSampleBuffer {
-    func toPCMBuffer(format: AVAudioFormat) -> AVAudioPCMBuffer? {
-        let n = AVAudioFrameCount(CMSampleBufferGetNumSamples(self))
-        guard n > 0, let pcm = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: n) else { return nil }
-        pcm.frameLength = n
-        let st = CMSampleBufferCopyPCMDataIntoAudioBufferList(
-            self, at: 0, frameCount: Int32(n), into: pcm.mutableAudioBufferList)
-        return st == noErr ? pcm : nil
-    }
+func die(_ msg: String, code: Int32) -> Never {
+    FileHandle.standardError.write("Lỗi bắt tiếng hệ thống: \(msg)\n".data(using: .utf8)!)
+    exit(code)
 }
 
-@available(macOS 13.0, *)
-final class Cap: NSObject, SCStreamOutput, SCStreamDelegate {
+@available(macOS 14.2, *)
+final class TapCap {
     let outURL: URL
+    var tapID = AudioObjectID(kAudioObjectUnknown)
+    var aggID = AudioObjectID(kAudioObjectUnknown)
+    var procID: AudioDeviceIOProcID?
     var file: AVAudioFile?
-    var stream: SCStream?
+    var format: AVAudioFormat?
     let q = DispatchQueue(label: "wz.syscap.audio")
 
     init(_ url: URL) { self.outURL = url }
 
-    func start() async throws {
-        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
-        guard let display = content.displays.first else {
-            FileHandle.standardError.write("Không tìm thấy màn hình.\n".data(using: .utf8)!)
-            exit(2)
+    func start() throws {
+        // 1) Tap toàn cục: trộn stereo audio đầu ra của MỌI tiến trình.
+        //    Đây là bước xin quyền "System Audio Recording Only" (hỏi 1 lần);
+        //    bị từ chối / macOS cũ -> trả lỗi ngay, wz.py poll thấy chết sớm
+        //    sẽ hạ xuống mic-only + WARN_NOSYS.
+        let desc = CATapDescription(stereoGlobalTapButExcludeProcesses: [])
+        desc.isPrivate = true       // không hiện thành thiết bị cho app khác thấy
+        desc.muteBehavior = .unmuted // user vẫn nghe âm thanh bình thường
+        var st = AudioHardwareCreateProcessTap(desc, &tapID)
+        guard st == noErr, tapID != kAudioObjectUnknown else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(st),
+                          userInfo: [NSLocalizedDescriptionKey: "AudioHardwareCreateProcessTap \(st) (chưa cấp quyền Ghi âm thanh hệ thống?)"])
         }
-        let filter = SCContentFilter(display: display, excludingWindows: [])
-        let cfg = SCStreamConfiguration()
-        cfg.capturesAudio = true
-        cfg.sampleRate = 48000
-        cfg.channelCount = 2
-        cfg.width = 2; cfg.height = 2            // video tối thiểu (SCStream yêu cầu)
-        cfg.minimumFrameInterval = CMTime(value: 1, timescale: 1)
-        let s = SCStream(filter: filter, configuration: cfg, delegate: self)
-        try s.addStreamOutput(self, type: .audio, sampleHandlerQueue: q)
-        try await s.startCapture()
-        self.stream = s
+
+        // 2) Format thật của tap (thường float32, stereo, sample rate của thiết bị ra)
+        var asbd = AudioStreamBasicDescription()
+        var size = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioTapPropertyFormat,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        st = AudioObjectGetPropertyData(tapID, &addr, 0, nil, &size, &asbd)
+        guard st == noErr, let fmt = AVAudioFormat(streamDescription: &asbd) else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(st),
+                          userInfo: [NSLocalizedDescriptionKey: "kAudioTapPropertyFormat \(st)"])
+        }
+        format = fmt
+
+        // 3) Aggregate device ẨN (private) chứa tap - không có sub-device nào khác
+        let aggDesc: [String: Any] = [
+            kAudioAggregateDeviceNameKey as String: "wz-syscap",
+            kAudioAggregateDeviceUIDKey as String: "wz-syscap-\(UUID().uuidString)",
+            kAudioAggregateDeviceIsPrivateKey as String: true,
+            kAudioAggregateDeviceIsStackedKey as String: false,
+            kAudioAggregateDeviceTapAutoStartKey as String: true,
+            kAudioAggregateDeviceSubDeviceListKey as String: [[String: Any]](),
+            kAudioAggregateDeviceTapListKey as String: [
+                [
+                    kAudioSubTapUIDKey as String: desc.uuid.uuidString,
+                    kAudioSubTapDriftCompensationKey as String: true
+                ]
+            ]
+        ]
+        st = AudioHardwareCreateAggregateDevice(aggDesc as CFDictionary, &aggID)
+        guard st == noErr, aggID != kAudioObjectUnknown else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(st),
+                          userInfo: [NSLocalizedDescriptionKey: "AudioHardwareCreateAggregateDevice \(st)"])
+        }
+
+        // 4) IOProc: buffer input của aggregate = dữ liệu tap -> ghi WAV
+        st = AudioDeviceCreateIOProcIDWithBlock(&procID, aggID, q) { [weak self] _, inData, _, _, _ in
+            self?.write(inData)
+        }
+        guard st == noErr, procID != nil else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(st),
+                          userInfo: [NSLocalizedDescriptionKey: "AudioDeviceCreateIOProcIDWithBlock \(st)"])
+        }
+        st = AudioDeviceStart(aggID, procID)
+        guard st == noErr else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(st),
+                          userInfo: [NSLocalizedDescriptionKey: "AudioDeviceStart \(st)"])
+        }
         FileHandle.standardError.write("WZ_SYSCAP_STARTED\n".data(using: .utf8)!)
     }
 
-    func stream(_ stream: SCStream, didOutputSampleBuffer sb: CMSampleBuffer, of type: SCStreamOutputType) {
-        guard type == .audio, sb.isValid, sb.dataReadiness == .ready else { return }
-        guard let fd = sb.formatDescription,
-              var asbd = fd.audioStreamBasicDescription.map({ $0 }),
-              let fmt = AVAudioFormat(streamDescription: &asbd),
-              let pcm = sb.toPCMBuffer(format: fmt) else { return }
+    private func write(_ abl: UnsafePointer<AudioBufferList>) {
+        guard let fmt = format,
+              let pcm = AVAudioPCMBuffer(pcmFormat: fmt, bufferListNoCopy: abl, deallocator: nil),
+              pcm.frameLength > 0 else { return }
         if file == nil {
             file = try? AVAudioFile(forWriting: outURL, settings: fmt.settings,
                                     commonFormat: fmt.commonFormat, interleaved: fmt.isInterleaved)
@@ -60,9 +103,21 @@ final class Cap: NSObject, SCStreamOutput, SCStreamDelegate {
     }
 
     func stop() {
-        stream?.stopCapture(completionHandler: { _ in })
-        // Đóng file TRÊN ĐÚNG queue ghi (q) để tránh data race với callback
-        // didOutputSampleBuffer đang write cùng lúc. q là serial nên an toàn.
+        if let p = procID {
+            AudioDeviceStop(aggID, p)
+            AudioDeviceDestroyIOProcID(aggID, p)
+            procID = nil
+        }
+        if aggID != kAudioObjectUnknown {
+            AudioHardwareDestroyAggregateDevice(aggID)
+            aggID = kAudioObjectUnknown
+        }
+        if tapID != kAudioObjectUnknown {
+            AudioHardwareDestroyProcessTap(tapID)
+            tapID = kAudioObjectUnknown
+        }
+        // Đóng file TRÊN ĐÚNG queue ghi (q) để tránh data race với IOProc block
+        // đang write cùng lúc. q là serial nên an toàn.
         q.sync { self.file = nil }   // flush + đóng file
     }
 }
@@ -73,15 +128,10 @@ guard CommandLine.arguments.count >= 2 else {
 }
 let url = URL(fileURLWithPath: CommandLine.arguments[1])
 
-if #available(macOS 13.0, *) {
-    let cap = Cap(url)
-    Task {
-        do { try await cap.start() }
-        catch {
-            FileHandle.standardError.write("Lỗi bắt tiếng hệ thống: \(error)\n".data(using: .utf8)!)
-            exit(3)
-        }
-    }
+if #available(macOS 14.2, *) {
+    let cap = TapCap(url)
+    do { try cap.start() }
+    catch { die(error.localizedDescription, code: 3) }
     signal(SIGINT, SIG_IGN)
     signal(SIGTERM, SIG_IGN)
     // Signal source PHẢI nằm trên background queue (không phải .main): dispatchMain()
@@ -91,7 +141,7 @@ if #available(macOS 13.0, *) {
     let sigQ = DispatchQueue(label: "wz.syscap.signal")
     let onStop: () -> Void = {
         cap.stop()
-        Thread.sleep(forTimeInterval: 0.3)  // cho ScreenCaptureKit flush nốt buffer
+        Thread.sleep(forTimeInterval: 0.3)  // cho Core Audio flush nốt buffer
         exit(0)
     }
     var signalSources: [DispatchSourceSignal] = []
@@ -103,6 +153,7 @@ if #available(macOS 13.0, *) {
     }
     dispatchMain()
 } else {
-    FileHandle.standardError.write("Cần macOS 13 trở lên.\n".data(using: .utf8)!)
+    // macOS < 14.2: không có Process Tap API. Thoát sớm -> engine hạ mic-only + cảnh báo.
+    FileHandle.standardError.write("Cần macOS 14.2 trở lên để thu tiếng hệ thống.\n".data(using: .utf8)!)
     exit(4)
 }
