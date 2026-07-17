@@ -551,7 +551,7 @@ def _meeting_glossary(out_dir):
     1. bộ sửa lỗi chung của sản phẩm (cạnh engine)
     2. file cũ ~/wz-bien-ban/glossary.yaml nếu còn (tương thích bản trước)
     3. TẤT CẢ hồ sơ được chọn cho cuộc họp này (profiles/<tên>/glossary.yaml),
-       ví dụ chọn "Cá nhân" + "DC" thì gộp cả hai - hồ sơ không chọn KHÔNG nạp."""
+       ví dụ chọn "Cá nhân" + "Công việc" thì gộp cả hai - hồ sơ không chọn KHÔNG nạp."""
     try:
         meta = json.loads((out_dir / "meeting.json").read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001

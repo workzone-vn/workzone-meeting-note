@@ -115,7 +115,7 @@ export function Settings({
             Viết <b>tự do bằng văn xuôi</b> - không cần theo định dạng nào: bạn là ai, họp với
             những ai (tên + chức vụ), công ty làm gì, sản phẩm tên gì, từ nào hay bị nghe sai... AI
             đọc phần này để viết biên bản đúng tên, đúng thuật ngữ và đúng ngữ cảnh. Khi ghi họp,
-            bạn chọn một hay nhiều hồ sơ (ví dụ <b>Cá nhân + DC</b>) - ngữ cảnh các hồ sơ được chọn
+            bạn chọn một hay nhiều hồ sơ (ví dụ <b>Cá nhân + Công việc</b>) - ngữ cảnh các hồ sơ được chọn
             sẽ gộp lại, hồ sơ không chọn không bao giờ lẫn vào. Tất cả nằm trên máy bạn.
           </div>
           <div className="profile-row" style={{ justifyContent: 'flex-start', marginBottom: 10 }}>
