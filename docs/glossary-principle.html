@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How glossary.yaml Improves Transcript Quality</title>
+<style>
+  :root {
+    --navy: #1c3d6e;
+    --azure: #2f7fd1;
+    --azure-soft: #eaf2fc;
+    --ground: #f6f8fc;
+    --surface: #ffffff;
+    --text: #26303f;
+    --muted: #64758c;
+    --border: #dfe7f2;
+    --wrong: #c23a3a;
+    --wrong-bg: #fdecec;
+    --fixed: #23824a;
+    --fixed-bg: #e8f6ee;
+    --spine: #b9cde6;
+    --code-bg: #12213a;
+    --code-text: #d5e6fb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --navy: #a9c8ef;
+      --azure: #5fa3e7;
+      --azure-soft: #17293f;
+      --ground: #0d1626;
+      --surface: #14213a;
+      --text: #dce6f5;
+      --muted: #8ba0bd;
+      --border: #263a58;
+      --wrong: #ec8080;
+      --wrong-bg: #3a1d22;
+      --fixed: #6fce97;
+      --fixed-bg: #16311f;
+      --spine: #33507a;
+      --code-bg: #0a1424;
+      --code-text: #c9ddf6;
+    }
+  }
+  :root[data-theme='light'] {
+    --navy: #1c3d6e;
+    --azure: #2f7fd1;
+    --azure-soft: #eaf2fc;
+    --ground: #f6f8fc;
+    --surface: #ffffff;
+    --text: #26303f;
+    --muted: #64758c;
+    --border: #dfe7f2;
+    --wrong: #c23a3a;
+    --wrong-bg: #fdecec;
+    --fixed: #23824a;
+    --fixed-bg: #e8f6ee;
+    --spine: #b9cde6;
+    --code-bg: #12213a;
+    --code-text: #d5e6fb;
+  }
+  :root[data-theme='dark'] {
+    --navy: #a9c8ef;
+    --azure: #5fa3e7;
+    --azure-soft: #17293f;
+    --ground: #0d1626;
+    --surface: #14213a;
+    --text: #dce6f5;
+    --muted: #8ba0bd;
+    --border: #263a58;
+    --wrong: #ec8080;
+    --wrong-bg: #3a1d22;
+    --fixed: #6fce97;
+    --fixed-bg: #16311f;
+    --spine: #33507a;
+    --code-bg: #0a1424;
+    --code-text: #c9ddf6;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 48px 24px 88px; }
+
+  .eyebrow {
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--azure);
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  h1 {
+    font-size: clamp(1.6rem, 4vw, 2.3rem);
+    line-height: 1.15;
+    margin: 0 0 12px;
+    color: var(--navy);
+    text-wrap: balance;
+    letter-spacing: -0.015em;
+  }
+  .lede { color: var(--muted); max-width: 62ch; margin: 0 0 40px; font-size: 1.02rem; }
+
+  h2 {
+    font-size: 1.05rem;
+    color: var(--navy);
+    margin: 52px 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  mono, .mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; }
+
+  /* ---------- Problem strip ---------- */
+  .hear-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .hear {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 13px;
+    font-size: 0.86rem;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+  .hear .w { color: var(--wrong); background: var(--wrong-bg); padding: 1px 7px; border-radius: 5px; }
+  .hear .arr { color: var(--muted); }
+  .hear .r { color: var(--fixed); background: var(--fixed-bg); padding: 1px 7px; border-radius: 5px; font-weight: 600; }
+
+  /* ---------- Pipeline ---------- */
+  .pipeline { position: relative; margin-top: 26px; }
+  .stage {
+    position: relative;
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 18px;
+    padding-bottom: 34px;
+  }
+  .stage:last-child { padding-bottom: 0; }
+  /* spine */
+  .stage::before {
+    content: '';
+    position: absolute;
+    left: 21px;
+    top: 46px;
+    bottom: -2px;
+    width: 2px;
+    background: var(--spine);
+  }
+  .stage:last-child::before { display: none; }
+  /* arrowhead on the spine */
+  .stage:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 16px;
+    bottom: 6px;
+    width: 0; height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid var(--spine);
+  }
+  .node-dot {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--azure);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.05rem;
+    z-index: 1;
+  }
+  .stage.quiet .node-dot { border-color: var(--spine); }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 20px;
+  }
+  .card .tag {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--azure);
+    margin-bottom: 4px;
+  }
+  .card h3 { margin: 0 0 4px; font-size: 1.02rem; color: var(--navy); }
+  .card p { margin: 0; color: var(--muted); font-size: 0.9rem; max-width: 68ch; }
+
+  .snippet {
+    margin-top: 12px;
+    background: var(--code-bg);
+    color: var(--code-text);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+    line-height: 1.7;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .snippet .bad { color: #ff9d9d; text-decoration: underline wavy #ff9d9d 1px; text-underline-offset: 3px; }
+  .snippet .good { color: #8fe6b2; font-weight: 600; }
+  .snippet .dim { opacity: 0.55; }
+
+  /* glossary branch */
+  .branch {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 14px;
+  }
+  @media (max-width: 640px) { .branch { grid-template-columns: 1fr; } }
+  .tier {
+    border: 1.5px dashed var(--spine);
+    border-radius: 12px;
+    padding: 13px 16px;
+    background: var(--azure-soft);
+  }
+  .tier .t-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+  .tier .t-name { font-weight: 700; color: var(--navy); font-size: 0.92rem; }
+  .tier .t-badge {
+    font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; border-radius: 999px; padding: 2px 9px;
+  }
+  .tier .ships { background: var(--azure); color: #fff; }
+  .tier .private { background: var(--fixed); color: #fff; }
+  .tier p { margin: 0 0 8px; font-size: 0.82rem; color: var(--muted); }
+  .tier .path {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.74rem; color: var(--azure); word-break: break-all;
+  }
+  .tier ul { margin: 8px 0 0; padding-left: 0; list-style: none; }
+  .tier li {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.78rem; padding: 2px 0;
+  }
+  .tier li b { font-weight: 600; }
+
+  .merge-note {
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.84rem;
+    color: var(--muted);
+  }
+  .merge-note .plus {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--azure); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; flex: none;
+  }
+
+  /* ---------- Principles ---------- */
+  .principles {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 640px) { .principles { grid-template-columns: 1fr; } }
+  .prin {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 20px;
+  }
+  .prin .k {
+    font-weight: 700; color: var(--navy); font-size: 0.94rem;
+    display: flex; gap: 9px; align-items: baseline; margin-bottom: 5px;
+  }
+  .prin .k::before { content: '›'; color: var(--azure); font-weight: 800; }
+  .prin p { margin: 0; font-size: 0.86rem; color: var(--muted); }
+  .prin p mono { color: var(--text); font-size: 0.92em; }
+
+  .foot {
+    margin-top: 56px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+    font-size: 0.78rem;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Workzone Meeting Note · Engine Design Note</div>
+  <h1>How <span class="mono">glossary.yaml</span> improves transcript quality</h1>
+  <p class="lede">
+    Vietnamese meetings are full of English terms — spoken with Vietnamese phonetics. Speech
+    recognition writes down what it <em>hears</em>, not what was <em>meant</em>. The glossary closes
+    that gap at the writing stage, without ever touching the recognizer or the raw recording.
+  </p>
+
+  <h2>The failure mode</h2>
+  <p class="lede" style="margin-bottom:18px">
+    Whisper transcribes Vietnamese-accented English phonetically. The words below are what a
+    perfectly good model actually hears:
+  </p>
+  <div class="hear-row">
+    <span class="hear"><span class="w">đét lai</span><span class="arr">should be</span><span class="r">deadline</span></span>
+    <span class="hear"><span class="w">ây pi ai</span><span class="arr">should be</span><span class="r">API</span></span>
+    <span class="hear"><span class="w">phít bách</span><span class="arr">should be</span><span class="r">feedback</span></span>
+    <span class="hear"><span class="w">mít tinh</span><span class="arr">should be</span><span class="r">meeting</span></span>
+    <span class="hear"><span class="w">rô đờ mép</span><span class="arr">should be</span><span class="r">roadmap</span></span>
+    <span class="hear"><span class="w">cờ rim</span><span class="arr">should be</span><span class="r">CRM</span></span>
+  </div>
+
+  <h2>Where the correction happens</h2>
+  <div class="pipeline">
+
+    <div class="stage quiet">
+      <div class="node-dot">🎙</div>
+      <div class="card">
+        <span class="tag">Input</span>
+        <h3>Meeting audio</h3>
+        <p>Microphone + system audio, recorded on-device. The audio never leaves the machine.</p>
+      </div>
+    </div>
+
+    <div class="stage quiet">
+      <div class="node-dot">🧠</div>
+      <div class="card">
+        <span class="tag">Stage 1 · On-device</span>
+        <h3>Whisper large-v3 transcribes</h3>
+        <p>
+          Runs locally on Apple Silicon. It is <b>never modified or fine-tuned</b> — the glossary
+          does not interfere with recognition.
+        </p>
+        <div class="snippet"><span class="dim">[00:14:02]</span> chốt <span class="bad">đét lai</span> tuần sau, đội kỹ thuật nối <span class="bad">ây pi ai</span> trước
+<span class="dim">[00:14:19]</span> gửi <span class="bad">phít bách</span> cho chị <span class="bad">mai cồ</span> qua email</div>
+      </div>
+    </div>
+
+    <div class="stage quiet">
+      <div class="node-dot">📄</div>
+      <div class="card">
+        <span class="tag">Preserved verbatim</span>
+        <h3>Raw transcript — kept untouched</h3>
+        <p>
+          The phonetic transcript is saved as-is (<span class="mono">transcript.raw.txt</span>).
+          Corrections are applied to the <em>minutes</em>, never destructively to the source of truth.
+        </p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="node-dot">📖</div>
+      <div class="card" style="border-color: var(--azure);">
+        <span class="tag">Stage 2 · The glossary joins here</span>
+        <h3>Claude writes the minutes, glossary in hand</h3>
+        <p>
+          Both glossary tiers are merged into the writing prompt as
+          <b>“misheard&nbsp;→&nbsp;correct” hints</b>. Claude applies them contextually while
+          summarizing — a dictionary for the writer, not a blind find-and-replace.
+        </p>
+        <div class="branch">
+          <div class="tier">
+            <div class="t-head">
+              <span class="t-name">Product tier</span>
+              <span class="t-badge ships">ships with app</span>
+            </div>
+            <p>Generic terms Vietnamese speakers commonly pronounce in local phonetics. No names, no companies — safe to distribute.</p>
+            <div class="path">app resources / glossary.yaml</div>
+            <ul>
+              <li>đét lai → <b>deadline</b></li>
+              <li>ây pi ai → <b>API</b></li>
+              <li>bắt dét → <b>budget</b></li>
+            </ul>
+          </div>
+          <div class="tier">
+            <div class="t-head">
+              <span class="t-name">Personal tier</span>
+              <span class="t-badge private">stays on your machine</span>
+            </div>
+            <p>Your people, brands, and product names. Editable inside the app; never bundled with the product.</p>
+            <div class="path">~/wz-bien-ban/glossary.yaml</div>
+            <ul>
+              <li>mai cồ → <b>Michael</b></li>
+              <li>ác me → <b>Acme Corp</b></li>
+            </ul>
+          </div>
+        </div>
+        <div class="merge-note">
+          <span class="plus">+</span>
+          <span>Merged at prompt time. On conflicts, the personal tier wins — you know your own names best.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="node-dot">✅</div>
+      <div class="card">
+        <span class="tag">Output</span>
+        <h3>Minutes with correct terminology</h3>
+        <p>Summary, decisions, and action items read the way people actually meant them.</p>
+        <div class="snippet"><span class="dim">## Action items</span>
+| Task                          | Owner    | <span class="good">Deadline</span>  |
+| Connect the <span class="good">API</span>, send <span class="good">feedback</span> | <span class="good">Michael</span>  | next week |</div>
+      </div>
+    </div>
+
+  </div>
+
+  <h2>Design principles</h2>
+  <div class="principles">
+    <div class="prin">
+      <div class="k">Fix at writing time, not recognition time</div>
+      <p>No fine-tuning, no custom acoustic model. The recognizer stays stock and upgradeable; quality improves in the step where context is richest.</p>
+    </div>
+    <div class="prin">
+      <div class="k">Hints, not rules</div>
+      <p>Entries are guidance the writer applies with judgment. “<mono>sêu</mono>” becomes “sale” only where the sentence is actually about sales.</p>
+    </div>
+    <div class="prin">
+      <div class="k">The raw transcript is sacred</div>
+      <p>Every correction is additive. The verbatim record survives untouched, so nothing is ever silently rewritten or lost.</p>
+    </div>
+    <div class="prin">
+      <div class="k">Private data stays private</div>
+      <p>The product tier contains zero personal data. The personal tier lives only in <mono>~/wz-bien-ban/</mono> and reaches no one but your own Claude account.</p>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>Workzone Meeting Note — engine design note</span>
+    <span class="mono">glossary.yaml · two-tier correction</span>
+  </div>
+</div>
+</body>
+</html>
