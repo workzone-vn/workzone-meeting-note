@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react'
-import type { AudioDevice, EngineCheck, Settings as S, SetupStatus } from '../../../shared/types'
+import type {
+  AudioDevice,
+  EngineCheck,
+  Settings as S,
+  SetupStatus,
+  GitSyncConfig
+} from '../../../shared/types'
 import { ClaudeGuide } from '../components/ClaudeGuide'
 import { CheckCircle, FolderOpen, Lock, PencilSimple, Warning } from '../components/icons'
 
@@ -21,6 +27,11 @@ export function Settings({
   const [glossaryTab, setGlossaryTab] = useState<string>('Cá nhân')
   const [newProfile, setNewProfile] = useState('')
   const [renameDraft, setRenameDraft] = useState<string | null>(null) // null = không đổi tên
+  const [git, setGit] = useState<GitSyncConfig | null>(null)
+  const [gitTokenSet, setGitTokenSet] = useState(false)
+  const [gitTokenDraft, setGitTokenDraft] = useState('')
+  const [gitTesting, setGitTesting] = useState(false)
+  const [gitNote, setGitNote] = useState<string | null>(null)
 
   useEffect(() => {
     void window.wz.settingsGet().then((s) => {
@@ -29,6 +40,10 @@ export function Settings({
     })
     void window.wz.devicesList().then(setDevices)
     void window.wz.profilesList().then(setProfiles)
+    void window.wz.gitSyncConfigGet().then((r) => {
+      setGit(r.config)
+      setGitTokenSet(r.tokenSet)
+    })
   }, [])
 
   // nạp từ điển theo tab đang chọn (Chung hoặc từng công ty)
@@ -258,6 +273,93 @@ export function Settings({
           </div>
         )}
       </div>
+
+      {git && (
+        <div className="card">
+          <div className="field">
+            <div className="label">Đồng bộ Wiki lên GitHub</div>
+            <div className="hint">
+              Backup và đồng bộ 2 chiều thư mục Wiki với một GitHub repo riêng. Tạo{' '}
+              <a
+                href="#"
+                onClick={(ev) => {
+                  ev.preventDefault()
+                  void window.wz.openExternal('https://github.com/settings/tokens?type=beta')
+                }}
+              >
+                fine-grained token
+              </a>{' '}
+              chỉ với quyền <b>Contents: Read and write</b> cho đúng repo backup, rồi dán vào ô dưới.
+            </div>
+          </div>
+
+          <div className="field">
+            <div className="label">Repo URL</div>
+            <input
+              type="text"
+              placeholder="https://github.com/<owner>/<repo>.git"
+              value={git.repoUrl}
+              onChange={(e) => setGit({ ...git, repoUrl: e.target.value })}
+              onBlur={() => void window.wz.gitSyncConfigSet({ repoUrl: git.repoUrl.trim() })}
+            />
+          </div>
+
+          <div className="field">
+            <div className="label">GitHub token (PAT)</div>
+            <input
+              type="password"
+              placeholder={gitTokenSet ? '•••••••• (đã lưu - để trống nếu không đổi)' : 'github_pat_...'}
+              value={gitTokenDraft}
+              onChange={(e) => setGitTokenDraft(e.target.value)}
+            />
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button
+                className="btn"
+                onClick={async () => {
+                  await window.wz.gitSyncSetToken(gitTokenDraft.trim() || null)
+                  setGitTokenDraft('')
+                  const r = await window.wz.gitSyncConfigGet()
+                  setGitTokenSet(r.tokenSet)
+                  setGitNote('Đã lưu token.')
+                  setTimeout(() => setGitNote(null), 2500)
+                }}
+              >
+                Lưu token
+              </button>
+              <button
+                className="btn"
+                disabled={gitTesting}
+                onClick={async () => {
+                  setGitTesting(true)
+                  await window.wz.gitSyncConfigSet({ repoUrl: git.repoUrl.trim() })
+                  const r = await window.wz.gitSyncTest()
+                  setGitTesting(false)
+                  setGitNote(r.ok ? 'Kết nối OK.' : `Lỗi: ${r.message ?? 'không rõ'}`)
+                }}
+              >
+                {gitTesting ? 'Đang kiểm tra...' : 'Kiểm tra kết nối'}
+              </button>
+              {gitNote && (
+                <span className="hint" style={{ margin: 0 }}>
+                  {gitNote}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {git.lastSyncedAt && (
+            <div className="hint">
+              Lần đồng bộ gần nhất: {new Date(git.lastSyncedAt).toLocaleString('vi-VN')} —{' '}
+              {git.lastSyncStatus === 'ok'
+                ? 'thành công'
+                : git.lastSyncStatus === 'conflict'
+                  ? 'có xung đột'
+                  : 'lỗi'}
+              {git.lastSyncMessage ? ` (${git.lastSyncMessage})` : ''}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="card">
         <div className="label" style={{ fontWeight: 600, color: 'var(--navy)', marginBottom: 6 }}>
