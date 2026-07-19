@@ -89,12 +89,14 @@ export function WikiGraph({
     resize()
 
     const dark = document.documentElement.getAttribute('data-theme') === 'dark'
+    // Màu graph theo design system "Anthropic warm": node note = coral (thực thể
+    // chính), node tag = teal phụ, chữ = ink/kem theo Sáng/Tối.
     const colors = {
-      edge: dark ? 'rgba(147,164,187,0.25)' : 'rgba(107,124,145,0.3)',
-      note: dark ? '#93a4bb' : '#6b7c91',
-      tag: '#35b06a',
-      label: dark ? '#e4ebf5' : '#26303f',
-      labelDim: dark ? '#93a4bb' : '#6b7c91'
+      edge: dark ? 'rgba(160,157,150,0.28)' : 'rgba(61,61,58,0.28)',
+      note: '#cc785c',
+      tag: '#5db8a6',
+      label: dark ? '#faf9f5' : '#141413',
+      labelDim: dark ? '#a09d96' : '#6c6a64'
     }
 
     const tick = (): void => {

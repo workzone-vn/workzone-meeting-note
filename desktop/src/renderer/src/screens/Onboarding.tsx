@@ -52,7 +52,7 @@ export function Onboarding({ onDone }: { onDone: () => void }): React.JSX.Elemen
     <div className="content" style={{ height: '100%' }}>
       <div className="onboard">
         <div className="hero" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
-          <div className="eyebrow" style={{ color: '#aecbf0', fontSize: '0.72rem', letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 600 }}>
+          <div className="eyebrow" style={{ color: 'var(--on-dark-soft)', fontSize: '0.72rem', letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 600 }}>
             Claude Recorder · Cài đặt lần đầu
           </div>
           <h1>Claude Recorder</h1>

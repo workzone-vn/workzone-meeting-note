@@ -198,6 +198,22 @@ export function UploadSimple({ size = 20, className }: IconProps): React.JSX.Ele
   )
 }
 
+export function DownloadSimple({ size = 20, className }: IconProps): React.JSX.Element {
+  return (
+    <svg
+      viewBox="0 0 256 256"
+      width={size}
+      height={size}
+      fill="currentColor"
+      aria-hidden
+      className={`icon ${className ?? ''}`}
+    >
+      <path d="M216,48V208H40V48A16,16,0,0,1,56,32H200A16,16,0,0,1,216,48Z" opacity="0.2"/>
+      <path d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0ZM90.34,141.66a8,8,0,0,1,11.32-11.32L120,148.69V40a8,8,0,0,1,16,0V148.69l18.34-18.35a8,8,0,0,1,11.32,11.32l-32,32a8,8,0,0,1-11.32,0Z"/>
+    </svg>
+  )
+}
+
 export function FolderOpen({ size = 20, className }: IconProps): React.JSX.Element {
   return (
     <svg

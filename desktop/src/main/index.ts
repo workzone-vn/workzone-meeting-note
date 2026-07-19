@@ -1,5 +1,6 @@
 import { app, dialog } from 'electron'
 import * as path from 'path'
+import { registerAssetScheme, serveAssetProtocol } from './assetProtocol'
 import { isRecording } from './engine/EngineService'
 import { registerIpc } from './ipc'
 import { syscapPath } from './paths'
@@ -16,7 +17,11 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', () => showMainWindow())
 
+  // Phải đăng ký scheme TRƯỚC app.ready
+  registerAssetScheme()
+
   app.whenReady().then(() => {
+    serveAssetProtocol()
     // Dev chạy bằng binary Electron nên dock không tự có icon; bản đóng gói dùng icns
     if (!app.isPackaged && process.platform === 'darwin') {
       try {
