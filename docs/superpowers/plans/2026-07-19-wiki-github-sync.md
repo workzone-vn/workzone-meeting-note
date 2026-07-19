@@ -576,11 +576,12 @@ async function pushWithRetry(
   branch: string,
   token: string,
   author: GitAuthor
-): Promise<void> {
+): Promise<IntegrateResult | null> {
   const push = () =>
     git.push({ fs, http, dir, remote: 'origin', ref: branch, onAuth: authFor(token) })
   try {
     await push()
+    return null // push thẳng, không có merge lần hai
   } catch (e) {
     if (e instanceof git.Errors.PushRejectedError) {
       await git.fetch({
@@ -593,8 +594,9 @@ async function pushWithRetry(
         tags: false,
         onAuth: authFor(token)
       })
-      await integrateRemote(dir, branch, author)
+      const retryMerged = await integrateRemote(dir, branch, author)
       await push()
+      return retryMerged // trả kết quả merge lần hai để không báo sót xung đột
     } else {
       throw e
     }
@@ -625,10 +627,17 @@ export async function syncWiki(opts: SyncOptions): Promise<SyncResult> {
   onProgress?.('merge')
   const merged = await integrateRemote(dir, branch, author)
   onProgress?.('push')
-  await pushWithRetry(dir, branch, token, author)
+  const retryMerged = await pushWithRetry(dir, branch, token, author)
   onProgress?.('done')
-  if (merged.status === 'conflict') {
-    return { status: 'conflict', pushed: true, conflicts: merged.conflicts, commitOid }
+  // Cả merge đầu lẫn merge retry (khi PushRejectedError = máy khác vừa push) đều có
+  // thể xung đột — gộp cả hai để không báo sót.
+  const conflicts = [
+    ...(merged.status === 'conflict' ? merged.conflicts : []),
+    ...(retryMerged?.status === 'conflict' ? retryMerged.conflicts : [])
+  ]
+  const unique = [...new Set(conflicts)]
+  if (unique.length > 0) {
+    return { status: 'conflict', pushed: true, conflicts: unique, commitOid }
   }
   return { status: 'ok', pushed: true, commitOid }
 }
