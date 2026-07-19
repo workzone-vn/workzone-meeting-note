@@ -73,13 +73,18 @@ Chạy trong main process (`GitSyncStore.ts`). Đầu vào: `wikiDir`, config, t
 3. **Fetch** từ `origin`.
 4. **Merge** `origin/<branch>` vào local:
    - Local chỉ đi sau remote → fast-forward.
-   - Phân nhánh → merge 3 chiều (`abortOnConflict: false`). File text (`.md`) tự
-     merge; đoạn xung đột được chèn conflict marker.
-5. **Kiểm tra xung đột còn lại:** nếu còn conflict marker trong file text, hoặc có
-   xung đột file nhị phân trong `assets/` (không tự merge được) → **DỪNG, KHÔNG
-   push**. Trả về trạng thái `conflict` kèm danh sách file để người dùng sửa rồi
-   Sync lại. Không mất dữ liệu (commit local đã lưu, remote chưa bị đụng).
-6. **Push** lên `origin/<branch>`.
+   - Phân nhánh, không đụng nhau → merge 3 chiều tự động.
+5. **Xung đột = "GIỮ CẢ HAI BẢN"** (isomorphic-git KHÔNG ghi conflict marker ra
+   working dir — đã kiểm chứng). Khi hai bên sửa cùng file khác nội dung:
+   - Giữ bản **local** làm file chính; lưu bản **remote** thành file cạnh bên
+     `<tên>.remote-<sha>.<đuôi>` (áp dụng cho cả `.md` lẫn ảnh nhị phân trong
+     `assets/`).
+   - Thay đổi KHÔNG xung đột từ remote vẫn được merge vào (không mất).
+   - Tạo **merge commit 2 parent** để remote thành tổ tiên → lần sync sau không
+     xung đột lại. Vẫn **push** (hai máy hội tụ, backup cả hai bản).
+   - Trả trạng thái `conflict` + danh sách file để UI nhắc người dùng gộp thủ công
+     rồi xoá file `.remote-`. Không mất dữ liệu.
+6. **Push** lên `origin/<branch>` (kể cả trường hợp xung đột ở bước 5).
 7. Cập nhật `lastSyncedAt`, `lastSyncStatus`, `lastSyncMessage`; đẩy event tiến
    trình về renderer trong lúc chạy (bắt đầu / fetch / merge / push / xong).
 
@@ -88,7 +93,7 @@ Chạy trong main process (`GitSyncStore.ts`). Đầu vào: `wikiDir`, config, t
 - **Remote trống:** init → commit toàn bộ wiki hiện có → push. Xong.
 - **Remote đã có note (máy thứ 2):** init → fetch → merge remote vào local (giữ
   cả note local mới lẫn note remote — merge gộp) → push. Nếu đụng nhau → như
-  bước 5 (dừng, báo xung đột).
+  bước 5 (giữ cả hai bản, vẫn push).
 
 ## 7. Giao diện
 
@@ -133,20 +138,23 @@ Chạy trong main process (`GitSyncStore.ts`). Đầu vào: `wikiDir`, config, t
 
 ## 10. Kiểm thử
 
-- Unit test thuật toán sync với một "remote" là **bare repo cục bộ** (file://):
-  - Repo trống → push toàn bộ.
-  - Local đi sau remote → fast-forward về.
-  - Phân nhánh, không đụng nhau → merge tự động + push.
-  - Phân nhánh, xung đột `.md` → dừng ở trạng thái `conflict`, không push.
-  - Xung đột file nhị phân trong `assets/` → dừng đúng.
-  - Push non-fast-forward → tự merge lại rồi push thành công.
-- Test đọc/ghi config: token vào `.env`, config vào `settings.json`, renderer chỉ
-  thấy "đã đặt token".
+- Unit test phần không cần mạng (isomorphic-git chỉ fetch/push qua HTTP, không có
+  transport `file://`): giả lập trạng thái "đã fetch" bằng cách ghi ref
+  `refs/remotes/origin/main`, rồi kiểm tra:
+  - `stageAndCommit`: commit file mới; trả `null` khi sạch; ghi nhận file bị xoá.
+  - `origin/main` chưa có → no-op; local trống + remote có → fast-forward nhận remote.
+  - Phân nhánh, không đụng nhau → merge tự động, giữ cả hai phía.
+  - Xung đột → **giữ cả hai bản**: file chính = local, tạo `<tên>.remote-<sha>`,
+    merge commit 2 parent, và **không mất** thay đổi không xung đột từ remote.
+  - `ensureRepo`: init + set origin, đổi URL chạy lại không lỗi.
+- Phần cần mạng (fetch / push / testConnection / non-fast-forward) kiểm thử thủ
+  công với một GitHub repo thật (mục e2e).
 
 ## 11. Ngoài phạm vi (v1)
 
 - Đồng bộ tự động (nền / định kỳ / theo save).
 - OAuth device flow, SSH.
 - Đồng bộ các thư mục khác ngoài `wiki/`.
-- UI giải quyết xung đột trong app (v1: người dùng tự sửa file rồi Sync lại).
+- UI gộp xung đột trong app (v1: giữ cả hai bản — người dùng tự gộp file chính với
+  file `.remote-<sha>` rồi xoá file `.remote-`, sau đó Sync lại).
 - Quản lý nhiều repo / nhiều nhánh cùng lúc.

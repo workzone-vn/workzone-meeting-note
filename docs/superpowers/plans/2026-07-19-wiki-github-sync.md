@@ -226,7 +226,14 @@ EOF
 - Consumes: `stageAndCommit`, `GitAuthor` (Task 2).
 - Produces:
   - `type IntegrateResult = { status: 'ok' } | { status: 'conflict'; conflicts: string[] }`
-  - `async function integrateRemote(dir: string, branch: string, author: GitAuthor): Promise<IntegrateResult>` — merge `refs/remotes/origin/<branch>` vào `<branch>`, cập nhật working dir. Nếu `origin/<branch>` chưa tồn tại → `{ status: 'ok' }` (không làm gì). Nếu local chưa có commit → nhận thẳng remote. Xung đột không tự giải quyết được → `{ status: 'conflict', conflicts }` (working dir chứa file có conflict marker).
+  - `async function integrateRemote(dir: string, branch: string, author: GitAuthor): Promise<IntegrateResult>` — merge `refs/remotes/origin/<branch>` vào `<branch>`, cập nhật working dir. Nếu `origin/<branch>` chưa tồn tại → `{ status: 'ok' }` (không làm gì). Nếu local chưa có commit → nhận thẳng remote.
+
+**Chiến lược xung đột = "GIỮ CẢ HAI BẢN"** (isomorphic-git KHÔNG ghi conflict marker ra working dir — đã kiểm chứng với v1.38.x). Khi merge có xung đột (`MergeConflictError`, `abortOnConflict: false` nên index đã chứa kết quả merge: file KHÔNG xung đột ở stage 0, file xung đột ở stage 1/2/3):
+1. Với mỗi file xung đột: giữ bản **local** làm file chính (ghi ra working dir + `git.add` để resolve index về stage 0), và lưu bản **remote** thành file cạnh bên `<tên>.remote-<7 ký tự sha remote><đuôi>` (đọc blob remote qua `git.readBlob`), rồi `git.add` file cạnh bên đó. Nếu một phía đã xoá file → phía đó không tạo nội dung tương ứng (local xoá → `git.remove`; remote xoá → không tạo file `.remote-`).
+2. File KHÔNG xung đột giữ nguyên kết quả merge sẵn có trong index (bao gồm thay đổi mới từ remote — KHÔNG được để mất).
+3. Tạo **merge commit 2 parent** `[localOid, remoteOid]` từ index → remote thành tổ tiên, lần sync sau không xung đột lại.
+4. `git.checkout` để đưa toàn bộ cây merge (gồm file remote không xung đột) ra working dir.
+5. Trả `{ status: 'conflict', conflicts }` (danh sách file đã xung đột). Không mất dữ liệu.
 
 Ghi chú TDD: test dựng trạng thái "đã fetch" bằng cách ghi ref `refs/remotes/origin/main` trỏ tới commit local thứ hai — không cần mạng.
 
@@ -288,7 +295,7 @@ describe('integrateRemote', () => {
     expect(fs.existsSync(path.join(dir, 'local.md'))).toBe(true)
   })
 
-  it('báo conflict khi hai bên sửa cùng file khác nội dung', async () => {
+  it('xung đột: giữ local + tạo file .remote-<sha>, merge commit 2 parent', async () => {
     const dir = await initRepo()
     fs.writeFileSync(path.join(dir, 'note.md'), 'line1\n')
     const baseOid = await stageAndCommit(dir, AUTHOR)
@@ -302,6 +309,38 @@ describe('integrateRemote', () => {
     const res = await integrateRemote(dir, 'main', AUTHOR)
     expect(res.status).toBe('conflict')
     if (res.status === 'conflict') expect(res.conflicts).toContain('note.md')
+    // file chính giữ bản local
+    expect(fs.readFileSync(path.join(dir, 'note.md'), 'utf8')).toBe('line1 LOCAL\n')
+    // bản remote được lưu cạnh bên
+    const sib = path.join(dir, `note.remote-${remoteOid!.slice(0, 7)}.md`)
+    expect(fs.existsSync(sib)).toBe(true)
+    expect(fs.readFileSync(sib, 'utf8')).toBe('line1 REMOTE\n')
+    // merge commit có 2 parent
+    const head = await git.resolveRef({ fs, dir, ref: 'main' })
+    const commits = await git.log({ fs, dir, ref: head, depth: 1 })
+    expect(commits[0].commit.parent).toHaveLength(2)
+  })
+
+  it('xung đột KHÔNG làm mất thay đổi không xung đột từ remote', async () => {
+    const dir = await initRepo()
+    fs.writeFileSync(path.join(dir, 'note.md'), 'line1\n')
+    const baseOid = await stageAndCommit(dir, AUTHOR)
+    // remote: sửa note.md (sẽ xung đột) + thêm file mới không xung đột
+    fs.writeFileSync(path.join(dir, 'note.md'), 'line1 REMOTE\n')
+    fs.writeFileSync(path.join(dir, 'fromremote.md'), 'remote new file\n')
+    const remoteOid = await stageAndCommit(dir, AUTHOR)
+    await setRemoteRef(dir, remoteOid!)
+    // local: chỉ sửa note.md
+    await git.writeRef({ fs, dir, ref: 'refs/heads/main', value: baseOid!, force: true })
+    await git.checkout({ fs, dir, ref: 'main', force: true })
+    fs.writeFileSync(path.join(dir, 'note.md'), 'line1 LOCAL\n')
+    await stageAndCommit(dir, AUTHOR)
+    const res = await integrateRemote(dir, 'main', AUTHOR)
+    expect(res.status).toBe('conflict')
+    // file mới từ remote (không xung đột) PHẢI còn trên working dir + trong commit
+    expect(fs.readFileSync(path.join(dir, 'fromremote.md'), 'utf8')).toBe('remote new file\n')
+    const files = await git.listFiles({ fs, dir, ref: 'main' })
+    expect(files).toContain('fromremote.md')
   })
 })
 ```
@@ -313,11 +352,30 @@ Expected: FAIL — `integrateRemote` chưa export.
 
 - [ ] **Step 3: Viết implementation**
 
-Thêm vào `desktop/src/main/gitsync/GitSync.ts`:
+Thêm `import * as path from 'path'` vào đầu `desktop/src/main/gitsync/GitSync.ts` (cạnh `import * as fs from 'fs'`). Thêm implementation:
 ```ts
 export type IntegrateResult = { status: 'ok' } | { status: 'conflict'; conflicts: string[] }
 
-/** Merge origin/<branch> vào <branch> rồi cập nhật working dir. */
+/** Đọc nội dung 1 file tại 1 commit; null nếu file không tồn tại ở commit đó. */
+async function readBlobAt(dir: string, oid: string, filepath: string): Promise<Uint8Array | null> {
+  try {
+    const { blob } = await git.readBlob({ fs, dir, oid, filepath })
+    return blob
+  } catch {
+    return null
+  }
+}
+
+/** Tên file cạnh bên giữ bản remote: note.md -> note.remote-<sha>.md */
+function siblingPath(filepath: string, shortSha: string): string {
+  const slash = filepath.lastIndexOf('/')
+  const dot = filepath.lastIndexOf('.')
+  if (dot > slash) return `${filepath.slice(0, dot)}.remote-${shortSha}${filepath.slice(dot)}`
+  return `${filepath}.remote-${shortSha}`
+}
+
+/** Merge origin/<branch> vào <branch> rồi cập nhật working dir.
+ * Xung đột: GIỮ CẢ HAI BẢN (local là file chính, remote thành .remote-<sha>). */
 export async function integrateRemote(
   dir: string,
   branch: string,
@@ -347,12 +405,42 @@ export async function integrateRemote(
     await git.checkout({ fs, dir, ref: branch, force: true })
     return { status: 'ok' }
   } catch (e) {
-    if (e instanceof git.Errors.MergeConflictError) {
-      await git.checkout({ fs, dir, ref: branch, force: true })
-      const data = (e as { data?: { filepaths?: string[] } }).data
-      return { status: 'conflict', conflicts: data?.filepaths ?? [] }
+    if (!(e instanceof git.Errors.MergeConflictError)) throw e
+    // "Giữ cả hai bản": index sau merge lỗi đã chứa kết quả cho file KHÔNG xung đột
+    // (stage 0) + file xung đột ở stage 1/2/3. Giải quyết từng file xung đột: giữ
+    // local, lưu remote thành .remote-<sha>, resolve index về stage 0.
+    const conflicts: string[] = (e as { data?: { filepaths?: string[] } }).data?.filepaths ?? []
+    const shortSha = remoteOid.slice(0, 7)
+    for (const filepath of conflicts) {
+      const ours = await readBlobAt(dir, localOid, filepath)
+      const theirs = await readBlobAt(dir, remoteOid, filepath)
+      const abs = path.join(dir, filepath)
+      if (ours) {
+        await fs.promises.mkdir(path.dirname(abs), { recursive: true })
+        await fs.promises.writeFile(abs, Buffer.from(ours))
+        await git.add({ fs, dir, filepath }) // resolve -> stage 0 = bản local
+      } else {
+        await fs.promises.rm(abs, { force: true })
+        await git.remove({ fs, dir, filepath })
+      }
+      if (theirs) {
+        const sib = siblingPath(filepath, shortSha)
+        const sibAbs = path.join(dir, sib)
+        await fs.promises.mkdir(path.dirname(sibAbs), { recursive: true })
+        await fs.promises.writeFile(sibAbs, Buffer.from(theirs))
+        await git.add({ fs, dir, filepath: sib })
+      }
     }
-    throw e
+    // merge commit 2 parent: remote thành tổ tiên -> lần sync sau không xung đột lại
+    await git.commit({
+      fs,
+      dir,
+      message: `merge origin/${branch} (giữ cả hai bản; xung đột: ${conflicts.join(', ')})`,
+      author,
+      parent: [localOid, remoteOid]
+    })
+    await git.checkout({ fs, dir, ref: branch, force: true })
+    return { status: 'conflict', conflicts }
   }
 }
 ```
@@ -362,7 +450,7 @@ export async function integrateRemote(
 Run: `cd desktop && npx vitest run test/gitsync.test.ts`
 Expected: PASS (tất cả test integrateRemote + stageAndCommit).
 
-Ghi chú: nếu phiên bản isomorphic-git cài thực tế trả lỗi/di sản khác (tên class `MergeConflictError`, hình dạng `.data.filepaths`, hoặc cần `checkout` khác), chỉnh implementation cho khớp cho tới khi test xanh — đây chính là mục đích của TDD. Không đổi test (chúng phản ánh hành vi mong muốn).
+Ghi chú quan trọng: điểm rủi ro là hành vi của `git.add` trên file đang ở trạng thái unmerged (stage 1/2/3) — nó phải resolve về stage 0. Nếu isomorphic-git bản cài thực tế cư xử khác (add không resolve unmerged, hoặc index sau `MergeConflictError` không giữ file không-xung-đột ở stage 0), hãy viết một script nháp trong scratchpad để dò hành vi thật, rồi chỉnh IMPLEMENTATION cho tới khi TẤT CẢ test xanh. KHÔNG được làm yếu test. Nếu thư viện về bản chất không làm được (đặc biệt test "KHÔNG mất thay đổi không xung đột"), STOP và báo BLOCKED kèm hành vi quan sát được.
 
 - [ ] **Step 5: Commit**
 
@@ -513,7 +601,9 @@ async function pushWithRetry(
   }
 }
 
-/** Đồng bộ 2 chiều: commit local -> fetch -> merge -> push. Dừng nếu xung đột. */
+/** Đồng bộ 2 chiều: commit local -> fetch -> merge -> push.
+ * Xung đột dùng chiến lược "giữ cả hai bản": integrateRemote đã tạo merge commit
+ * hợp lệ (tích hợp remote) nên VẪN push để hai máy hội tụ + backup cả bản .remote. */
 export async function syncWiki(opts: SyncOptions): Promise<SyncResult> {
   const { dir, remoteUrl, branch, token, authorName, authorEmail, onProgress } = opts
   const author: GitAuthor = { name: authorName, email: authorEmail }
@@ -534,12 +624,12 @@ export async function syncWiki(opts: SyncOptions): Promise<SyncResult> {
   })
   onProgress?.('merge')
   const merged = await integrateRemote(dir, branch, author)
-  if (merged.status === 'conflict') {
-    return { status: 'conflict', pushed: false, conflicts: merged.conflicts, commitOid }
-  }
   onProgress?.('push')
   await pushWithRetry(dir, branch, token, author)
   onProgress?.('done')
+  if (merged.status === 'conflict') {
+    return { status: 'conflict', pushed: true, conflicts: merged.conflicts, commitOid }
+  }
   return { status: 'ok', pushed: true, commitOid }
 }
 
@@ -828,7 +918,7 @@ import { syncWiki, testConnection } from './gitsync/GitSync'
         lastSyncStatus: res.status,
         lastSyncMessage:
           res.status === 'conflict'
-            ? `Xung đột: ${(res.conflicts ?? []).join(', ')}`
+            ? `Xung đột (đã giữ cả 2 bản, xem file .remote-*): ${(res.conflicts ?? []).join(', ')}`
             : 'Đồng bộ thành công.'
       })
       return res
@@ -1081,7 +1171,7 @@ Trong component `Wiki`, thêm:
       const res = await window.wz.gitSyncNow()
       setSyncNote(
         res.status === 'conflict'
-          ? `Có xung đột ở: ${(res.conflicts ?? []).join(', ')}. Sửa file rồi Sync lại.`
+          ? `Có xung đột ở: ${(res.conflicts ?? []).join(', ')}. Đã giữ cả 2 bản — bản của máy kia nằm ở file "<tên>.remote-*". Xem, gộp thủ công rồi xoá file .remote.`
           : 'Đồng bộ thành công.'
       )
       reload()
@@ -1159,7 +1249,7 @@ Run: `cd desktop && npm run dev`
 - [ ] **Step 5: Kiểm chứng xung đột**
 
 - Sửa cùng một dòng của một note ở hai nơi: trên GitHub web (commit) và trong app (chưa sync).
-- Bấm "Sync GitHub" → kỳ vọng thông báo "Có xung đột ở: <file>. Sửa file rồi Sync lại.". Mở file trong Wiki thấy conflict marker (`<<<<<<<`); sửa tay bỏ marker, Sync lại → thành công.
+- Bấm "Sync GitHub" → kỳ vọng thông báo "Có xung đột ở: <file>. Đã giữ cả 2 bản...". Kiểm tra: note gốc giữ bản local; xuất hiện thêm file `<tên>.remote-<sha>.md` chứa bản của máy kia; trên GitHub có cả hai file (đã push merge commit). Gộp thủ công + xoá file `.remote-`, Sync lại → thành công, lần sau không xung đột lại.
 
 - [ ] **Step 6: Cập nhật tài liệu tiến độ**
 
