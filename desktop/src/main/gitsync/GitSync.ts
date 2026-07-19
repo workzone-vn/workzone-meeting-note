@@ -49,9 +49,12 @@ function siblingPath(filepath: string, shortSha: string): string {
 /** Merge origin/<branch> vào <branch> rồi cập nhật working dir.
  * Xung đột: GIỮ CẢ HAI BẢN (local là file chính, remote thành .remote-<sha>).
  * QUAN TRỌNG: nhánh xung đột stage TOÀN BỘ thay đổi trong working dir trước khi
- * tạo merge commit — vì vậy phải gọi hàm này NGAY SAU `stageAndCommit`, không có
- * thay đổi chưa commit nào khác xen giữa, nếu không các sửa đổi không liên quan
- * sẽ bị cuốn vào merge commit. */
+ * tạo merge commit — vì vậy phải gọi hàm này khi KHÔNG có thay đổi chưa commit
+ * nào khác (ngoài phần integrateRemote tự tạo ra) trong working dir, nếu không
+ * các sửa đổi không liên quan sẽ bị cuốn vào merge commit. Điều kiện này đúng ở
+ * CẢ HAI nơi gọi hàm này: (1) trong `syncWiki` ngay sau `stageAndCommit`, và
+ * (2) trong `pushWithRetry` khi retry sau `PushRejectedError` — vì integrateRemote
+ * luôn để lại working tree sạch (đã commit) sau khi chạy xong. */
 export async function integrateRemote(
   dir: string,
   branch: string,
@@ -161,7 +164,7 @@ export async function ensureRepo(
   author: GitAuthor
 ): Promise<void> {
   await fs.promises.mkdir(dir, { recursive: true })
-  if (!fs.existsSync(`${dir}/.git`)) {
+  if (!fs.existsSync(path.join(dir, '.git'))) {
     await git.init({ fs, dir, defaultBranch: branch })
   }
   const remotes = await git.listRemotes({ fs, dir })
@@ -176,16 +179,21 @@ export async function ensureRepo(
   await git.setConfig({ fs, dir, path: 'user.email', value: author.email })
 }
 
+/** Push lên origin; nếu bị từ chối (PushRejectedError, tức có commit mới trên
+ * remote kể từ lần fetch trước), fetch lại + integrateRemote lần 2 rồi push lại.
+ * Trả về kết quả merge của lần retry đó (để syncWiki không bỏ sót xung đột phát
+ * sinh ở lần merge thứ hai), hoặc null nếu push đầu thành công (không retry). */
 async function pushWithRetry(
   dir: string,
   branch: string,
   token: string,
   author: GitAuthor
-): Promise<void> {
+): Promise<IntegrateResult | null> {
   const push = () =>
     git.push({ fs, http, dir, remote: 'origin', ref: branch, onAuth: authFor(token) })
   try {
     await push()
+    return null
   } catch (e) {
     if (e instanceof git.Errors.PushRejectedError) {
       await git.fetch({
@@ -198,8 +206,9 @@ async function pushWithRetry(
         tags: false,
         onAuth: authFor(token)
       })
-      await integrateRemote(dir, branch, author)
+      const retryMerged = await integrateRemote(dir, branch, author)
       await push()
+      return retryMerged
     } else {
       throw e
     }
@@ -232,10 +241,18 @@ export async function syncWiki(opts: SyncOptions): Promise<SyncResult> {
   // xem doc-comment trên integrateRemote.
   const merged = await integrateRemote(dir, branch, author)
   onProgress?.('push')
-  await pushWithRetry(dir, branch, token, author)
+  const retryMerged = await pushWithRetry(dir, branch, token, author)
   onProgress?.('done')
-  if (merged.status === 'conflict') {
-    return { status: 'conflict', pushed: true, conflicts: merged.conflicts, commitOid }
+  // Cả merge đầu (integrateRemote) lẫn merge retry trong pushWithRetry (khi bị
+  // PushRejectedError, tức máy khác vừa push) đều có thể xung đột — phải gộp cả
+  // hai để không báo sót xung đột từ lần merge thứ hai.
+  const conflicts = [
+    ...(merged.status === 'conflict' ? merged.conflicts : []),
+    ...(retryMerged?.status === 'conflict' ? retryMerged.conflicts : [])
+  ]
+  const unique = [...new Set(conflicts)]
+  if (unique.length > 0) {
+    return { status: 'conflict', pushed: true, conflicts: unique, commitOid }
   }
   return { status: 'ok', pushed: true, commitOid }
 }
