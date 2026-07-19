@@ -23,3 +23,44 @@ export async function stageAndCommit(dir: string, author: GitAuthor): Promise<st
     author
   })
 }
+
+export type IntegrateResult = { status: 'ok' } | { status: 'conflict'; conflicts: string[] }
+
+/** Merge origin/<branch> vào <branch> rồi cập nhật working dir. */
+export async function integrateRemote(
+  dir: string,
+  branch: string,
+  author: GitAuthor
+): Promise<IntegrateResult> {
+  const remoteRef = `refs/remotes/origin/${branch}`
+  let remoteOid: string
+  try {
+    remoteOid = await git.resolveRef({ fs, dir, ref: remoteRef })
+  } catch {
+    return { status: 'ok' } // remote chưa có nhánh này
+  }
+  let localOid: string | null = null
+  try {
+    localOid = await git.resolveRef({ fs, dir, ref: branch })
+  } catch {
+    /* local chưa có commit */
+  }
+  if (localOid === remoteOid) return { status: 'ok' }
+  if (!localOid) {
+    await git.writeRef({ fs, dir, ref: `refs/heads/${branch}`, value: remoteOid, force: true })
+    await git.checkout({ fs, dir, ref: branch, force: true })
+    return { status: 'ok' }
+  }
+  try {
+    await git.merge({ fs, dir, ours: branch, theirs: remoteRef, author, abortOnConflict: false })
+    await git.checkout({ fs, dir, ref: branch, force: true })
+    return { status: 'ok' }
+  } catch (e) {
+    if (e instanceof git.Errors.MergeConflictError) {
+      await git.checkout({ fs, dir, ref: branch, force: true })
+      const data = (e as { data?: { filepaths?: string[] } }).data
+      return { status: 'conflict', conflicts: data?.filepaths ?? [] }
+    }
+    throw e
+  }
+}
