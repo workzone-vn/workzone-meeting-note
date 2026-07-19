@@ -4,7 +4,17 @@
 // - Đồ thị: WikiGraph (canvas force-directed).
 import { useEffect, useMemo, useState } from 'react'
 import type { WikiAskResult, WikiNote, WikiNoteMeta } from '../../../shared/types'
-import { Graph, PaperPlaneTilt, PencilSimple, Plus, Sparkle, Trash } from '../components/icons'
+import {
+  ArrowsClockwise,
+  Copy,
+  DownloadSimple,
+  Graph,
+  PaperPlaneTilt,
+  Plus,
+  Sparkle,
+  Trash
+} from '../components/icons'
+import { NoteEditor } from '../components/NoteEditor'
 import { WikiGraph } from '../components/WikiGraph'
 import { fmtMeetingTime, mdToHtml } from '../lib/format'
 
@@ -22,15 +32,21 @@ export function Wiki(): React.JSX.Element {
   const [view, setView] = useState<'list' | 'graph' | { note: string }>('list')
   const [query, setQuery] = useState('')
   const [tagFilter, setTagFilter] = useState('')
-  // trang note
+  // trang note (editor luôn-sửa-được; draft phản chiếu title/tags/content hiện tại)
   const [note, setNote] = useState<WikiNote | null>(null)
-  const [edit, setEdit] = useState<{ title: string; tags: string; content: string } | null>(null)
+  const [draft, setDraft] = useState<{ title: string; tags: string; content: string }>({
+    title: '',
+    tags: '',
+    content: ''
+  })
   // hỏi AI
   const [question, setQuestion] = useState('')
   const [asking, setAsking] = useState(false)
   const [answer, setAnswer] = useState<WikiAskResult | null>(null)
   const [exporting, setExporting] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
+  const [syncNote, setSyncNote] = useState<string | null>(null)
 
   const reload = (): void => {
     void window.wz.wikiList().then(setNotes)
@@ -38,24 +54,42 @@ export function Wiki(): React.JSX.Element {
   useEffect(reload, [])
 
   const openNote = (id: string): void => {
-    setEdit(null)
     setNote(null)
     setView({ note: id })
     void window.wz.wikiGet(id).then(setNote)
+  }
+
+  // Đồng bộ draft khi mở note khác (dùng note.id để không reset lúc reload cùng note).
+  useEffect(() => {
+    if (note) setDraft({ title: note.title, tags: note.tags.join(', '), content: note.content })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note?.id])
+
+  const parseTags = (s: string): string[] =>
+    s.split(',').map((t) => t.trim().replace(/^#/, '')).filter(Boolean)
+
+  // Lưu note: gộp patch vào draft rồi ghi xuống đĩa (title/tags/content).
+  const saveNote = async (patch: Partial<typeof draft>): Promise<typeof draft> => {
+    const next = { ...draft, ...patch }
+    setDraft(next)
+    if (note) {
+      await window.wz.wikiSave(note.id, {
+        title: next.title.trim() || 'Ghi chú mới',
+        tags: parseTags(next.tags),
+        content: next.content
+      })
+    }
+    return next
   }
 
   const createNew = async (title = ''): Promise<void> => {
     const id = await window.wz.wikiCreate(title)
     reload()
     openNote(id)
-    setEdit({ title: title || 'Ghi chú mới', tags: '', content: '' })
   }
 
-  // bấm wikilink trong nội dung: có note -> mở, chưa có -> tạo mới với tên đó
-  const onArticleClick = async (e: React.MouseEvent): Promise<void> => {
-    const el = (e.target as HTMLElement).closest('[data-wiki]')
-    if (!el) return
-    const target = el.getAttribute('data-wiki') ?? ''
+  // bấm wikilink trong editor: có note -> mở, chưa có -> tạo mới với tên đó
+  const handleWikilinkClick = async (target: string): Promise<void> => {
     const id = await window.wz.wikiResolve(target)
     if (id) openNote(id)
     else await createNew(target)
@@ -70,6 +104,43 @@ export function Wiki(): React.JSX.Element {
       setAnswer(await window.wz.wikiAsk(q))
     } finally {
       setAsking(false)
+    }
+  }
+
+  const runSync = async (): Promise<void> => {
+    const { config } = await window.wz.gitSyncConfigGet()
+    if (!config.repoUrl) {
+      setSyncNote('Chưa cấu hình repo — vào Cài đặt để thiết lập.')
+      setTimeout(() => setSyncNote(null), 4000)
+      return
+    }
+    setSyncing(true)
+    setSyncNote('Đang đồng bộ...')
+    const off = window.wz.onGitSyncProgress((p) => {
+      const label: Record<string, string> = {
+        start: 'Bắt đầu...',
+        commit: 'Lưu thay đổi...',
+        fetch: 'Tải về...',
+        merge: 'Gộp...',
+        push: 'Đẩy lên...',
+        done: 'Xong.'
+      }
+      setSyncNote(label[p] ?? 'Đang đồng bộ...')
+    })
+    try {
+      const res = await window.wz.gitSyncNow()
+      setSyncNote(
+        res.status === 'conflict'
+          ? `Có xung đột ở: ${(res.conflicts ?? []).join(', ')}. Đã giữ cả 2 bản — bản của máy kia nằm ở file "<tên>.remote-*". Xem, gộp thủ công rồi xoá file .remote.`
+          : 'Đồng bộ thành công.'
+      )
+      reload()
+    } catch (e) {
+      setSyncNote(`Lỗi đồng bộ: ${(e as Error).message}`)
+    } finally {
+      off()
+      setSyncing(false)
+      setTimeout(() => setSyncNote(null), 6000)
     }
   }
 
@@ -105,149 +176,126 @@ export function Wiki(): React.JSX.Element {
   if (typeof view === 'object') {
     if (!note) return <div className="empty">Đang tải...</div>
     return (
-      <div>
+      <div className="wiki-note-view">
         <div className="detail-head">
           <button
             className="btn"
             onClick={() => {
               setView('list')
               setNote(null)
-              setEdit(null)
               reload()
             }}
           >
             ← Wiki
           </button>
-          <h1 className="page-title" style={{ margin: 0 }}>
-            {edit ? 'Chỉnh sửa ghi chú' : note.title}
-          </h1>
-        </div>
-        {!edit && (
-          <p className="count" style={{ marginTop: 0 }}>
+          <p className="count" style={{ margin: 0 }}>
             {fmtMeetingTime(note.updated)}
-            {note.tags.length > 0 && (
-              <>
-                {' · '}
-                {note.tags.map((t) => (
-                  <span key={t} className="profile-tag">
-                    #{t}
-                  </span>
-                ))}
-              </>
-            )}
           </p>
-        )}
+        </div>
 
-        {edit ? (
-          <div>
-            <input
-              className="name-input"
-              placeholder="Tiêu đề"
-              value={edit.title}
-              onChange={(e) => setEdit({ ...edit, title: e.target.value })}
-            />
-            <input
-              className="name-input"
-              placeholder="Tags (phân cách bằng dấu phẩy): ai, marketing..."
-              value={edit.tags}
-              onChange={(e) => setEdit({ ...edit, tags: e.target.value })}
-            />
-            <textarea
-              className="md-editor"
-              placeholder={'Nội dung markdown. Liên kết ghi chú khác bằng [[Tiêu đề note]].'}
-              value={edit.content}
-              onChange={(e) => setEdit({ ...edit, content: e.target.value })}
-              spellCheck={false}
-            />
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button
-                className="btn primary"
-                onClick={async () => {
-                  await window.wz.wikiSave(note.id, {
-                    title: edit.title,
-                    tags: edit.tags.split(',').map((t) => t.trim().replace(/^#/, '')).filter(Boolean),
-                    content: edit.content
-                  })
-                  setEdit(null)
-                  openNote(note.id)
-                }}
-              >
-                Lưu
-              </button>
-              <button className="btn" onClick={() => setEdit(null)}>
-                Huỷ
-              </button>
+        {notice && <div className="banner warn">{notice}</div>}
+
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <button
+            className="btn"
+            onClick={async () => {
+              await saveNote({})
+              await window.wz.wikiCopyMarkdown(note.id)
+              setNotice('Đã copy Markdown vào clipboard')
+              setTimeout(() => setNotice(null), 2500)
+            }}
+          >
+            <Copy size={15} /> Copy Markdown
+          </button>
+          <button
+            className="btn"
+            onClick={async () => {
+              try {
+                await saveNote({})
+                const r = await window.wz.wikiExportMarkdown(note.id)
+                if (r.saved) {
+                  setNotice(`Đã tải: ${r.saved}`)
+                  setTimeout(() => setNotice(null), 4000)
+                }
+              } catch (e) {
+                setNotice(`Tải .md lỗi: ${e instanceof Error ? e.message : e}`)
+              }
+            }}
+          >
+            <DownloadSimple size={15} /> Tải .md
+          </button>
+          <button
+            className="btn"
+            disabled={exporting}
+            onClick={async () => {
+              setExporting(true)
+              setNotice(null)
+              try {
+                await saveNote({})
+                const body = renderNoteHtml(draft.content, resolvedMap)
+                const r = await window.wz.wikiExportPdf(note.id, body)
+                if (r.saved) {
+                  setNotice(`Đã xuất PDF: ${r.saved}`)
+                  setTimeout(() => setNotice(null), 4000)
+                }
+              } catch (e) {
+                setNotice(`Xuất PDF lỗi: ${e instanceof Error ? e.message : e}`)
+              } finally {
+                setExporting(false)
+              }
+            }}
+          >
+            {exporting ? 'Đang xuất...' : 'Xuất PDF'}
+          </button>
+          <button
+            className="btn danger-hover"
+            style={{ marginLeft: 'auto' }}
+            onClick={async () => {
+              const r = await window.wz.wikiDelete(note.id)
+              if (r.deleted) {
+                setView('list')
+                setNote(null)
+                reload()
+              }
+            }}
+          >
+            <Trash size={15} /> Xoá
+          </button>
+        </div>
+
+        <input
+          className="note-title-input"
+          placeholder="Tiêu đề ghi chú"
+          value={draft.title}
+          onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+          onBlur={() => void saveNote({})}
+        />
+        <input
+          className="note-tags-input"
+          placeholder="Tags (phân cách bằng dấu phẩy): ai, marketing…"
+          value={draft.tags}
+          onChange={(e) => setDraft({ ...draft, tags: e.target.value })}
+          onBlur={() => void saveNote({})}
+        />
+
+        <NoteEditor
+          key={note.id}
+          markdown={note.content}
+          onChange={(md) => void saveNote({ content: md })}
+          onClickWikilink={(t) => void handleWikilinkClick(t)}
+        />
+
+        {note.backlinks.length > 0 && (
+          <div className="card" style={{ marginTop: 16 }}>
+            <div style={{ fontWeight: 600, color: 'var(--navy)', marginBottom: 8 }}>Liên kết đến đây</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {note.backlinks.map((b) => (
+                <button key={b.id} className="profile-chip" onClick={() => openNote(b.id)}>
+                  {b.title}
+                </button>
+              ))}
             </div>
           </div>
-        ) : (
-          <>
-            {notice && <div className="banner warn">{notice}</div>}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <button
-                className="btn"
-                onClick={() =>
-                  setEdit({ title: note.title, tags: note.tags.join(', '), content: note.content })
-                }
-              >
-                <PencilSimple size={15} /> Chỉnh sửa
-              </button>
-              <button
-                className="btn"
-                disabled={exporting}
-                onClick={async () => {
-                  setExporting(true)
-                  setNotice(null)
-                  try {
-                    const body = renderNoteHtml(note.content, resolvedMap)
-                    const r = await window.wz.wikiExportPdf(note.id, body)
-                    if (r.saved) {
-                      setNotice(`Đã xuất PDF: ${r.saved}`)
-                      setTimeout(() => setNotice(null), 4000)
-                    }
-                  } catch (e) {
-                    setNotice(`Xuất PDF lỗi: ${e instanceof Error ? e.message : e}`)
-                  } finally {
-                    setExporting(false)
-                  }
-                }}
-              >
-                {exporting ? 'Đang xuất...' : 'Xuất PDF'}
-              </button>
-              <button
-                className="btn danger-hover"
-                style={{ marginLeft: 'auto' }}
-                onClick={async () => {
-                  const r = await window.wz.wikiDelete(note.id)
-                  if (r.deleted) {
-                    setView('list')
-                    setNote(null)
-                    reload()
-                  }
-                }}
-              >
-                <Trash size={15} /> Xoá
-              </button>
-            </div>
-            <article
-              className="doc"
-              onClick={(e) => void onArticleClick(e)}
-              dangerouslySetInnerHTML={{ __html: renderNoteHtml(note.content, resolvedMap) }}
-            />
-            {note.backlinks.length > 0 && (
-              <div className="card" style={{ marginTop: 16 }}>
-                <div style={{ fontWeight: 600, color: 'var(--navy)', marginBottom: 8 }}>
-                  Liên kết đến đây
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {note.backlinks.map((b) => (
-                    <button key={b.id} className="profile-chip" onClick={() => openNote(b.id)}>
-                      {b.title}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
         )}
       </div>
     )
@@ -291,7 +339,11 @@ export function Wiki(): React.JSX.Element {
         <button className="btn" onClick={() => setView('graph')} disabled={notes.length === 0}>
           <Graph size={15} /> Đồ thị
         </button>
+        <button className="btn" onClick={() => void runSync()} disabled={syncing}>
+          <ArrowsClockwise size={15} /> {syncing ? 'Đang đồng bộ...' : 'Sync GitHub'}
+        </button>
       </div>
+      {syncNote && <div className="banner warn" style={{ marginBottom: 14 }}>{syncNote}</div>}
 
       <div className="card wiki-ask">
         <div style={{ fontWeight: 600, color: 'var(--navy)', marginBottom: 8 }}>
