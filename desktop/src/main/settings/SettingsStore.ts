@@ -3,7 +3,8 @@
 import { app } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
-import type { Settings } from '../../shared/types'
+import * as os from 'os'
+import type { Settings, GitSyncConfig } from '../../shared/types'
 import { dataDir, envFile, systemAudioFlag } from '../paths'
 
 const settingsFile = (): string => path.join(app.getPath('userData'), 'settings.json')
@@ -21,6 +22,7 @@ interface LocalSettings {
   audioPermProbed?: boolean
   /** giao diện Sáng/Tối - mặc định "light" khi chưa có */
   theme?: 'light' | 'dark'
+  gitSync?: GitSyncConfig
 }
 
 function readLocal(): LocalSettings {
@@ -36,15 +38,62 @@ function writeLocal(patch: Partial<LocalSettings>): void {
   fs.writeFileSync(settingsFile(), JSON.stringify({ ...readLocal(), ...patch }))
 }
 
-function readHfToken(): string | null {
+function readEnvVar(key: string): string | null {
   try {
     for (const line of fs.readFileSync(envFile, 'utf8').split('\n')) {
-      if (line.startsWith('HF_TOKEN=')) return line.slice('HF_TOKEN='.length).trim() || null
+      if (line.startsWith(`${key}=`)) return line.slice(key.length + 1).trim() || null
     }
   } catch {
     /* chưa có .env */
   }
   return null
+}
+
+function writeEnvVar(key: string, value: string | null): void {
+  fs.mkdirSync(dataDir, { recursive: true })
+  let lines: string[] = []
+  try {
+    lines = fs
+      .readFileSync(envFile, 'utf8')
+      .split('\n')
+      .filter((l) => !l.startsWith(`${key}=`))
+  } catch {
+    /* chưa có .env */
+  }
+  lines = lines.filter((l) => l.trim() !== '')
+  if (value) lines.push(`${key}=${value}`)
+  fs.writeFileSync(envFile, lines.join('\n') + (lines.length ? '\n' : ''))
+}
+
+const readHfToken = (): string | null => readEnvVar('HF_TOKEN')
+
+export function readGithubToken(): string | null {
+  return readEnvVar('GITHUB_TOKEN')
+}
+
+export function writeGithubToken(token: string | null): void {
+  writeEnvVar('GITHUB_TOKEN', token)
+}
+
+function defaultGitSync(): GitSyncConfig {
+  const host = os.hostname()
+  return {
+    enabled: false,
+    repoUrl: '',
+    branch: 'main',
+    authorName: host,
+    authorEmail: `${host}@wz-wiki-sync.local`
+  }
+}
+
+export function getGitSyncConfig(): GitSyncConfig {
+  return { ...defaultGitSync(), ...(readLocal().gitSync ?? {}) }
+}
+
+export function setGitSyncConfig(patch: Partial<GitSyncConfig>): GitSyncConfig {
+  const next = { ...getGitSyncConfig(), ...patch }
+  writeLocal({ gitSync: next })
+  return next
 }
 
 export function getSettings(): Settings {
@@ -57,7 +106,9 @@ export function getSettings(): Settings {
     audioDeviceIndex: local.audioDeviceIndex,
     lastProfiles,
     hfToken: readHfToken(),
-    theme: local.theme ?? 'light'
+    theme: local.theme ?? 'light',
+    gitSync: getGitSyncConfig(),
+    githubTokenSet: readGithubToken() !== null
   }
 }
 
@@ -77,15 +128,7 @@ export function setSettings(patch: Partial<Settings>): Settings {
     writeLocal({ theme: patch.theme })
   }
   if (patch.hfToken !== undefined) {
-    let lines: string[] = []
-    try {
-      lines = fs.readFileSync(envFile, 'utf8').split('\n').filter((l) => !l.startsWith('HF_TOKEN='))
-    } catch {
-      /* chưa có .env */
-    }
-    lines = lines.filter((l) => l.trim() !== '')
-    if (patch.hfToken) lines.push(`HF_TOKEN=${patch.hfToken}`)
-    fs.writeFileSync(envFile, lines.join('\n') + (lines.length ? '\n' : ''))
+    writeEnvVar('HF_TOKEN', patch.hfToken)
   }
   return getSettings()
 }

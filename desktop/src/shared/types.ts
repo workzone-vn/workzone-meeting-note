@@ -143,12 +143,25 @@ export interface SetupStatus {
   ready: boolean
 }
 
+export interface GitSyncConfig {
+  enabled: boolean
+  repoUrl: string // https://github.com/<owner>/<repo>.git
+  branch: string // mặc định "main"
+  authorName: string // mặc định os.hostname()
+  authorEmail: string // mặc định <hostname>@wz-wiki-sync.local
+  lastSyncedAt?: number // epoch ms
+  lastSyncStatus?: 'ok' | 'conflict' | 'error'
+  lastSyncMessage?: string
+}
+
 export interface Settings {
   systemAudio: boolean
   audioDeviceIndex: string | null // null = tự chọn mic thật
   lastProfiles: string[] // các hồ sơ ngữ cảnh dùng gần nhất (mặc định ["Cá nhân"])
   hfToken: string | null
   theme: 'light' | 'dark' // giao diện Sáng/Tối (mặc định "light")
+  gitSync: GitSyncConfig
+  githubTokenSet: boolean // renderer chỉ biết token đã đặt hay chưa
 }
 
 // Một việc cần làm trong trang Tasks (lưu ở ~/wz-bien-ban/tasks.json).
