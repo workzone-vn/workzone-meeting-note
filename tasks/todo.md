@@ -1,5 +1,37 @@
 # Electron Desktop App — tiến độ
 
+## TÍNH NĂNG (2026-07-18): Wiki editor kiểu Notion (Tiptap) + kéo-thả ảnh — v0.15.0
+Spec: `docs/superpowers/specs/2026-07-18-wiki-notion-editor-design.md` (đã duyệt). Thay textarea markdown thô bằng editor WYSIWYG luôn-sửa-được. Tham khảo `/Users/n/Code/ForFun/md-editor-plus` (Tiptap). Pin **Tiptap v2.27.2 + tiptap-markdown 0.8.10** (combo proven; v3 vỡ với tiptap-markdown), cài `--legacy-peer-deps` cho React 19. (Lưu ý: npm churn khi pin version đã xoá `vite` transitive + playwright → đã thêm lại `vite@7.3.6` vào devDeps.)
+- [x] Main: protocol `wzasset://` (assetProtocol.ts, registerSchemesAsPrivileged trước ready + protocol.handle sau ready, chỉ basename chặn traversal) + IPC `wiki:saveAsset(base64,ext)` ghi wiki/assets tên duy nhất trả rel; CSP thêm `img-src 'self' wzasset: data: blob:`
+- [x] NoteEditor.tsx: StarterKit + Underline/Link/TaskList/Table/Placeholder/GlobalDragHandle + ResolvedImage (renderHTML rewrite assets/→wzasset://, giữ rel khi serialize) + tiptap-markdown round-trip + bubble menu; kéo-thả/dán ảnh (handleDrop/handlePaste → base64 → saveAsset → chèn)
+- [x] Wikilink = DECORATION plugin (không phải node) → [[..]] giữ nguyên text (round-trip hiển nhiên), tô chip coral bấm điều hướng
+- [x] Slash "/" menu (suggestion + ReactRenderer + tippy): H1/2/3, list, checklist, quote, code, bảng, hr — tiếng Việt
+- [x] Wiki.tsx: bỏ read-view + textarea, editor luôn-sửa-được + autosave (debounce 600ms → wikiSave); title/tags input inline (serif); toolbar Copy MD/Tải .md/PDF/Xoá flush save trước; wikilink click resolve→openNote/tạo mới
+- [x] theme.css: prose editor + title/tags input + bubble/slash menu + drag-handle + checklist/table/code/img/wikilink — Sáng/Tối coral
+- [x] Verify (Playwright _electron, app thật): render markdown rich ✓; slash menu ✓; wikilink chip+click ✓; **round-trip fidelity note giàu nội dung** (h2 7→7, bullets 30→30, bold 48→48, len 6286→6287 chỉ +space) KHÔNG mất dữ liệu ✓; ảnh saveAsset+wzasset+drop chèn `<img src=wzasset://>` ✓; Sáng/Tối ✓; typecheck+build pass
+- [ ] User thử: gõ "/", kéo ảnh từ Finder vào, [[wikilink]], bảng/checklist
+
+## TÍNH NĂNG (2026-07-18): Wiki copy Markdown + tải .md — v0.14.2
+Trang note Wiki thêm 2 nút: **Copy Markdown** (clipboard) + **Tải .md** (save dialog). Markdown "sạch" portable (Obsidian-compatible): H1 tiêu đề + dòng tag inline `#..` + body, giữ nguyên `[[wikilink]]`. Helper `noteToMarkdown` dùng CHUNG cho cả 2 (đồng nhất output). Copy dùng Electron `clipboard.writeText` (né secure-context của file://); tải mượn mẫu wikiExportPdf (dialog mặc định ~/Downloads/<title>.md + showItemInFolder).
+- [x] icons.tsx: thêm DownloadSimple (Phosphor duotone, mirror UploadSimple); dùng lại Copy sẵn có
+- [x] ipc-contract: wikiCopyMarkdown + wikiExportMarkdown; preload 2 fn (type auto qua `WzApi = typeof wzApi`)
+- [x] ipc.ts: helper noteToMarkdown + 2 handler (clipboard / dialog+writeFile); import `clipboard` từ electron
+- [x] Wiki.tsx: 2 nút giữa "Chỉnh sửa" và "Xuất PDF"; notice "Đã copy Markdown vào clipboard"
+- [x] Verify: typecheck + build pass; chạy app THẬT (Playwright _electron) mở note có tag+body, bấm Copy -> pbpaste ra ĐÚNG markdown (H1 + tag inline + body, diacritics chuẩn); ảnh toolbar 4 nút render đúng tông coral. Tải .md verify by-construction (cùng helper đã verify + cùng mẫu save như PDF đang chạy)
+- [ ] User thử: Copy Markdown dán ra ngoài; Tải .md chọn nơi lưu
+
+## UI REFACTOR (2026-07-18): Design system mới "Anthropic warm" (cream + coral + serif)
+Áp design language từ `DESIGN-claude.md` (cream canvas #faf9f5 + coral #cc785c + display serif editorial) vào app. Chốt với user: **chỉ Electron app** (theme.css + renderer screens; render.py/guide.html/glossary docs GIỮ NGUYÊN navy tạm thời); **giữ cả Sáng/Tối** — dựng lại Tối từ chính dark surfaces của hệ (canvas #181715, card #252320, code #1f1e1b, on-dark cream, coral giữ nguyên); **nhúng font offline** (Cormorant Garamond display + Inter body + JetBrains Mono code, có subset Việt). Card = trắng-ấm trên nền kem (dễ đọc cho app dày nội dung); sidebar = warm-dark #181715 (nhịp kem↔tối). Cách làm: token remap — giữ tên biến cũ (`--navy/--azure/--ground/--surface`...) làm alias trỏ sang token mới để ~90 chỗ `var(--)` đổi 1 chỗ; hand-edit ~45 hex cứng + phần cấu trúc (sidebar, record-btn, revise FAB, doc th, dark overrides).
+- [x] Cài @fontsource cormorant-garamond + inter + jetbrains-mono (đã có subset vietnamese U+1EA0-1EF9)
+- [x] Import font trong main.tsx (500/600 serif, 400/500/600 inter, 400 mono)
+- [x] Rewrite :root theme.css: palette warm + alias tên cũ + token mới (coral/ink/surface-dark/on-dark/radius/font vars); body Inter; checkbox accent-color coral
+- [x] Restyle component + hex cứng: sidebar warm-dark, nút coral, record-btn coral, revise FAB/chat coral, card trắng-ấm r12, doc th surface-dark, badge/tab/wikilink coral, banner warm, mark amber, code.cmd dark, heading serif
+- [x] Dựng lại `:root[data-theme='dark']` từ dark surfaces hệ + sidebar #121110 (chỉ ghi đè primitive token -> alias tự đổi theo cascade)
+- [x] Hex cứng trong TSX: Onboarding eyebrow (var --on-dark-soft), WikiGraph node=coral/tag=teal/label=ink-kem (dark+light)
+- [x] Verify: typecheck + build pass; chạy app THẬT (Playwright _electron, IPC đầy đủ) chụp 6 màn × Sáng/Tối - render đúng, diacritics tiếng Việt hiện trên cả serif & Inter
+
+**Review:** Refactor thuần token/CSS + font, KHÔNG đụng logic. Điểm mấu chốt: giữ tên biến cũ (`--navy/--azure/--ground/--surface`) làm ALIAS trỏ token mới -> ~90 chỗ `var(--)` (kể cả inline style) đổi theme mà không sửa từng file; chế độ Tối chỉ ghi đè primitive token nên alias tự đổi theo cascade. Bẫy đã xử lý: 4 nền từng dùng `var(--navy)` (sidebar/hero/doc th/profile-chip.active) sẽ LẬT thành kem ở Tối khi `--ink`->cream -> đã tách token riêng (--sidebar-bg, gradient hero cứng warm-dark, --surface-dark cho th, coral cho chip). Font nhúng offline @fontsource (35 woff2, có subset vietnamese) -> chạy không cần mạng. Cormorant Garamond dùng weight 600 cho tiêu đề (mảnh ở size nhỏ; nếu user thấy quá mảnh -> đổi sang Fraunces 1 dòng). Verify bằng app thật qua Playwright _electron (main process + IPC thật), soi ảnh từng màn Sáng/Tối: sidebar warm-dark + wordmark serif, tiêu đề serif editorial, nút/chip/record-btn coral, card trắng-ấm trên nền kem. **Phạm vi: CHỈ Electron app** - render.py (viewer/print biên bản), huong-dan/guide.html, docs/glossary-principle.html VẪN navy/azure cũ (chờ user quyết mở rộng). CHƯA commit (chờ user).
+
 ## RELEASE (2026-07-17): v0.13.0 macOS + WINDOWS BETA
 Spec: `docs/superpowers/specs/2026-07-17-windows-beta-design.md`. User yêu cầu build Windows không có máy test -> phát hành BETA ghi rõ trong notes. https://github.com/workzone-vn/workzone-meeting-note/releases/tag/v0.13.0
 - [x] Engine `wz-win.py`: import wz.py + monkeypatch 3 điểm (_alive dùng OpenProcess - os.kill(pid,0) trên win là CTRL_C_EVENT; _transcribe = faster-whisper CPU int8 cùng format; ensure_ffmpeg = copy imageio binary vào DATA/bin, không symlink); ghi âm pyaudiowpatch mic + WASAPI loopback, recorder detached, DỪNG bằng file cờ .stop; stdout utf-8
