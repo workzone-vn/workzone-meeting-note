@@ -32,6 +32,9 @@ GitHub repo riêng, để:
 | Xác thực | Personal Access Token (PAT) do người dùng tạo trên GitHub |
 | Git engine | `isomorphic-git` + `isomorphic-git/http/node` (thuần JS, đóng gói trong app, chạy trong Electron main process) — không phụ thuộc git cài trên máy |
 | Máy thứ 2 lần đầu | **Merge gộp** cả note local sẵn có và note từ remote |
+| Tên tác giả commit | Tự lấy tên máy (`os.hostname()`) |
+| Quyền PAT | Fine-grained, chỉ Contents (read/write) cho đúng repo backup |
+| Ảnh (`assets/`) | Backup luôn cả ảnh (không `.gitignore`) |
 
 ## 4. Lưu cấu hình
 
@@ -45,8 +48,8 @@ Theo đúng tiền lệ hiện có trong codebase:
     enabled: boolean;
     repoUrl: string;        // https://github.com/<owner>/<repo>.git
     branch: string;         // mặc định "main"
-    authorName: string;     // dùng cho commit
-    authorEmail: string;
+    authorName: string;     // dùng cho commit — mặc định tự lấy hostname (os.hostname())
+    authorEmail: string;    // mặc định "<hostname>@wz-wiki-sync.local"
     lastSyncedAt?: number;  // epoch ms
     lastSyncStatus?: 'ok' | 'conflict' | 'error';
     lastSyncMessage?: string;
