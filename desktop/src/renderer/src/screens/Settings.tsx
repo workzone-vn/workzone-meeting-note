@@ -330,7 +330,8 @@ export function Settings({
               </button>
               <button
                 className="btn"
-                disabled={gitTesting}
+                disabled={gitTesting || !gitTokenSet}
+                title={!gitTokenSet ? 'Lưu token trước khi kiểm tra kết nối' : undefined}
                 onClick={async () => {
                   setGitTesting(true)
                   await window.wz.gitSyncConfigSet({ repoUrl: git.repoUrl.trim() })
