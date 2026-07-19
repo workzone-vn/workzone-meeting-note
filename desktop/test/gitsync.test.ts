@@ -137,6 +137,28 @@ describe('integrateRemote', () => {
     const files = await git.listFiles({ fs, dir, ref: 'main' })
     expect(files).toContain('fromremote.md')
   })
+
+  it('unrelated histories (vd. repo GitHub tạo sẵn README) vẫn merge được, không ném MergeNotSupportedError', async () => {
+    const dir = await initRepo()
+    fs.writeFileSync(path.join(dir, 'note.md'), 'LOCAL\n')
+    const localOid = await stageAndCommit(dir, AUTHOR)
+    // Giả lập remote root commit KHÔNG liên quan: xoá ref main + index để commit
+    // tiếp theo không có parent nào (root commit thứ 2, tách biệt hoàn toàn).
+    fs.rmSync(path.join(dir, '.git', 'refs', 'heads', 'main'), { force: true })
+    fs.rmSync(path.join(dir, '.git', 'index'), { force: true })
+    fs.writeFileSync(path.join(dir, 'note.md'), 'REMOTE\n')
+    fs.writeFileSync(path.join(dir, 'readme.md'), 'from remote\n')
+    const remoteOid = await stageAndCommit(dir, AUTHOR)
+    await setRemoteRef(dir, remoteOid!)
+    // khôi phục local về nhánh main gốc (root commit đầu, không liên quan tới remoteOid)
+    await git.writeRef({ fs, dir, ref: 'refs/heads/main', value: localOid!, force: true })
+    await git.checkout({ fs, dir, ref: 'main', force: true })
+    const res = await integrateRemote(dir, 'main', AUTHOR)
+    expect(['ok', 'conflict']).toContain(res.status)
+    expect(fs.readFileSync(path.join(dir, 'readme.md'), 'utf8')).toBe('from remote\n')
+    const files = await git.listFiles({ fs, dir, ref: 'main' })
+    expect(files).toContain('readme.md')
+  })
 })
 
 describe('ensureRepo', () => {

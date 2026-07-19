@@ -290,6 +290,8 @@ export function Settings({
                 fine-grained token
               </a>{' '}
               chỉ với quyền <b>Contents: Read and write</b> cho đúng repo backup, rồi dán vào ô dưới.
+              Nên tạo repo <b>trống</b> (không thêm README/.gitignore/license lúc tạo); nếu repo đã có
+              sẵn nội dung thì lần đồng bộ đầu vẫn gộp được bình thường (đã hỗ trợ).
             </div>
           </div>
 

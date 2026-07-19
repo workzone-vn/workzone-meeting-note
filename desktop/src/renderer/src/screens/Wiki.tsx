@@ -2,7 +2,7 @@
 // - Danh sách: tìm toàn văn, lọc tag, hỏi AI (Claude đọc note liên quan theo graph).
 // - Trang note: render markdown với wikilink bấm được + backlinks; sửa/xoá.
 // - Đồ thị: WikiGraph (canvas force-directed).
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { WikiAskResult, WikiNote, WikiNoteMeta } from '../../../shared/types'
 import {
   ArrowsClockwise,
@@ -47,6 +47,10 @@ export function Wiki(): React.JSX.Element {
   const [notice, setNotice] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [syncNote, setSyncNote] = useState<string | null>(null)
+  // Guard đồng bộ (synchronous) chống double-click trước khi gitSyncConfigGet
+  // resolve — setSyncing(true) chạy SAU await nên state syncing không kịp chặn
+  // click thứ 2 gần như đồng thời (race gây 2 sync chạy song song trên cùng git tree).
+  const syncingRef = useRef(false)
 
   const reload = (): void => {
     void window.wz.wikiList().then(setNotes)
@@ -108,8 +112,11 @@ export function Wiki(): React.JSX.Element {
   }
 
   const runSync = async (): Promise<void> => {
+    if (syncingRef.current) return
+    syncingRef.current = true
     const { config } = await window.wz.gitSyncConfigGet()
     if (!config.repoUrl) {
+      syncingRef.current = false
       setSyncNote('Chưa cấu hình repo — vào Cài đặt để thiết lập.')
       setTimeout(() => setSyncNote(null), 4000)
       return
@@ -140,6 +147,7 @@ export function Wiki(): React.JSX.Element {
     } finally {
       off()
       setSyncing(false)
+      syncingRef.current = false
       setTimeout(() => setSyncNote(null), 6000)
     }
   }

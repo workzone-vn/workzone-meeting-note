@@ -80,7 +80,20 @@ export async function integrateRemote(
     return { status: 'ok' }
   }
   try {
-    await git.merge({ fs, dir, ours: branch, theirs: remoteRef, author, abortOnConflict: false })
+    await git.merge({
+      fs,
+      dir,
+      ours: branch,
+      theirs: remoteRef,
+      author,
+      abortOnConflict: false,
+      // Repo GitHub tạo sẵn với README/.gitignore/license (flow "create repo" khuyến
+      // khích) sinh ra root commit KHÔNG chung tổ tiên với root commit local đầu
+      // tiên -> isomorphic-git ném MergeNotSupportedError (không phải
+      // MergeConflictError) và catch bên dưới sẽ rethrow, sync hỏng vĩnh viễn.
+      // Cho phép merge "unrelated histories" để lần sync đầu tiên vẫn gộp được.
+      allowUnrelatedHistories: true
+    })
     await git.checkout({ fs, dir, ref: branch, force: true })
     return { status: 'ok' }
   } catch (e) {
