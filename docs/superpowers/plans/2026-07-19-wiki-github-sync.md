@@ -401,7 +401,17 @@ export async function integrateRemote(
     return { status: 'ok' }
   }
   try {
-    await git.merge({ fs, dir, ours: branch, theirs: remoteRef, author, abortOnConflict: false })
+    // allowUnrelatedHistories: repo GitHub có sẵn commit (README...) không cùng gốc
+    // với local -> nếu thiếu cờ này isomorphic-git ném MergeNotSupportedError.
+    await git.merge({
+      fs,
+      dir,
+      ours: branch,
+      theirs: remoteRef,
+      author,
+      abortOnConflict: false,
+      allowUnrelatedHistories: true
+    })
     await git.checkout({ fs, dir, ref: branch, force: true })
     return { status: 'ok' }
   } catch (e) {

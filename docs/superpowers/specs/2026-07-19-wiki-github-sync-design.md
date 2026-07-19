@@ -71,7 +71,8 @@ Chạy trong main process (`GitSyncStore.ts`). Đầu vào: `wikiDir`, config, t
    đổi. Message: `sync from <hostname> <ISO timestamp>`. Tác giả lấy từ
    `authorName`/`authorEmail`.
 3. **Fetch** từ `origin`.
-4. **Merge** `origin/<branch>` vào local:
+4. **Merge** `origin/<branch>` vào local (`allowUnrelatedHistories: true` để sync
+   được cả khi repo GitHub đã có sẵn commit khởi tạo như README):
    - Local chỉ đi sau remote → fast-forward.
    - Phân nhánh, không đụng nhau → merge 3 chiều tự động.
 5. **Xung đột = "GIỮ CẢ HAI BẢN"** (isomorphic-git KHÔNG ghi conflict marker ra
