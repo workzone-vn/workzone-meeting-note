@@ -3,7 +3,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import * as git from 'isomorphic-git'
-import { stageAndCommit, integrateRemote } from '../src/main/gitsync/GitSync'
+import { stageAndCommit, integrateRemote, ensureRepo } from '../src/main/gitsync/GitSync'
 
 const AUTHOR = { name: 'test-host', email: 'test-host@wz-wiki-sync.local' }
 
@@ -136,5 +136,24 @@ describe('integrateRemote', () => {
     expect(fs.readFileSync(path.join(dir, 'fromremote.md'), 'utf8')).toBe('remote new file\n')
     const files = await git.listFiles({ fs, dir, ref: 'main' })
     expect(files).toContain('fromremote.md')
+  })
+})
+
+describe('ensureRepo', () => {
+  it('init repo + set origin khi thư mục trống', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wz-git-'))
+    await ensureRepo(dir, 'https://github.com/acme/wiki.git', 'main', AUTHOR)
+    expect(fs.existsSync(path.join(dir, '.git'))).toBe(true)
+    const remotes = await git.listRemotes({ fs, dir })
+    expect(remotes).toEqual([{ remote: 'origin', url: 'https://github.com/acme/wiki.git' }])
+    expect(await git.getConfig({ fs, dir, path: 'user.name' })).toBe(AUTHOR.name)
+  })
+
+  it('cập nhật origin khi đổi URL, chạy lại không lỗi', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wz-git-'))
+    await ensureRepo(dir, 'https://github.com/acme/old.git', 'main', AUTHOR)
+    await ensureRepo(dir, 'https://github.com/acme/new.git', 'main', AUTHOR)
+    const remotes = await git.listRemotes({ fs, dir })
+    expect(remotes).toEqual([{ remote: 'origin', url: 'https://github.com/acme/new.git' }])
   })
 })

@@ -3,6 +3,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import * as git from 'isomorphic-git'
+import http from 'isomorphic-git/http/node'
 
 export type GitAuthor = { name: string; email: string }
 
@@ -46,7 +47,11 @@ function siblingPath(filepath: string, shortSha: string): string {
 }
 
 /** Merge origin/<branch> vào <branch> rồi cập nhật working dir.
- * Xung đột: GIỮ CẢ HAI BẢN (local là file chính, remote thành .remote-<sha>). */
+ * Xung đột: GIỮ CẢ HAI BẢN (local là file chính, remote thành .remote-<sha>).
+ * QUAN TRỌNG: nhánh xung đột stage TOÀN BỘ thay đổi trong working dir trước khi
+ * tạo merge commit — vì vậy phải gọi hàm này NGAY SAU `stageAndCommit`, không có
+ * thay đổi chưa commit nào khác xen giữa, nếu không các sửa đổi không liên quan
+ * sẽ bị cuốn vào merge commit. */
 export async function integrateRemote(
   dir: string,
   branch: string,
@@ -124,5 +129,126 @@ export async function integrateRemote(
     })
     await git.checkout({ fs, dir, ref: branch, force: true })
     return { status: 'conflict', conflicts }
+  }
+}
+
+export type SyncPhase = 'start' | 'commit' | 'fetch' | 'merge' | 'push' | 'done'
+export type SyncOptions = {
+  dir: string
+  remoteUrl: string
+  branch: string
+  token: string
+  authorName: string
+  authorEmail: string
+  onProgress?: (p: SyncPhase) => void
+}
+export type SyncResult = {
+  status: 'ok' | 'conflict'
+  pushed: boolean
+  conflicts?: string[]
+  commitOid?: string | null
+}
+
+function authFor(token: string) {
+  return () => ({ username: token, password: 'x-oauth-basic' })
+}
+
+/** Đảm bảo `dir` là git repo, origin trỏ đúng remoteUrl, user.name/email đã set. */
+export async function ensureRepo(
+  dir: string,
+  remoteUrl: string,
+  branch: string,
+  author: GitAuthor
+): Promise<void> {
+  await fs.promises.mkdir(dir, { recursive: true })
+  if (!fs.existsSync(`${dir}/.git`)) {
+    await git.init({ fs, dir, defaultBranch: branch })
+  }
+  const remotes = await git.listRemotes({ fs, dir })
+  const origin = remotes.find((r) => r.remote === 'origin')
+  if (!origin) {
+    await git.addRemote({ fs, dir, remote: 'origin', url: remoteUrl })
+  } else if (origin.url !== remoteUrl) {
+    await git.deleteRemote({ fs, dir, remote: 'origin' })
+    await git.addRemote({ fs, dir, remote: 'origin', url: remoteUrl })
+  }
+  await git.setConfig({ fs, dir, path: 'user.name', value: author.name })
+  await git.setConfig({ fs, dir, path: 'user.email', value: author.email })
+}
+
+async function pushWithRetry(
+  dir: string,
+  branch: string,
+  token: string,
+  author: GitAuthor
+): Promise<void> {
+  const push = () =>
+    git.push({ fs, http, dir, remote: 'origin', ref: branch, onAuth: authFor(token) })
+  try {
+    await push()
+  } catch (e) {
+    if (e instanceof git.Errors.PushRejectedError) {
+      await git.fetch({
+        fs,
+        http,
+        dir,
+        remote: 'origin',
+        ref: branch,
+        singleBranch: true,
+        tags: false,
+        onAuth: authFor(token)
+      })
+      await integrateRemote(dir, branch, author)
+      await push()
+    } else {
+      throw e
+    }
+  }
+}
+
+/** Đồng bộ 2 chiều: commit local -> fetch -> merge -> push.
+ * Xung đột dùng chiến lược "giữ cả hai bản": integrateRemote đã tạo merge commit
+ * hợp lệ (tích hợp remote) nên VẪN push để hai máy hội tụ + backup cả bản .remote. */
+export async function syncWiki(opts: SyncOptions): Promise<SyncResult> {
+  const { dir, remoteUrl, branch, token, authorName, authorEmail, onProgress } = opts
+  const author: GitAuthor = { name: authorName, email: authorEmail }
+  onProgress?.('start')
+  await ensureRepo(dir, remoteUrl, branch, author)
+  onProgress?.('commit')
+  const commitOid = await stageAndCommit(dir, author)
+  onProgress?.('fetch')
+  await git.fetch({
+    fs,
+    http,
+    dir,
+    remote: 'origin',
+    ref: branch,
+    singleBranch: true,
+    tags: false,
+    onAuth: authFor(token)
+  })
+  onProgress?.('merge')
+  // integrateRemote phải chạy ngay sau stageAndCommit (không có edit lạ xen giữa) —
+  // xem doc-comment trên integrateRemote.
+  const merged = await integrateRemote(dir, branch, author)
+  onProgress?.('push')
+  await pushWithRetry(dir, branch, token, author)
+  onProgress?.('done')
+  if (merged.status === 'conflict') {
+    return { status: 'conflict', pushed: true, conflicts: merged.conflicts, commitOid }
+  }
+  return { status: 'ok', pushed: true, commitOid }
+}
+
+/** Kiểm tra repoUrl + token có truy cập được không (không đổi gì trên đĩa). */
+export async function testConnection(opts: {
+  remoteUrl: string
+  token: string
+}): Promise<{ ok: boolean; message?: string }> {
+  try {
+    await git.getRemoteInfo({ http, url: opts.remoteUrl, onAuth: authFor(opts.token) })
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, message: (e as Error).message || String(e) }
   }
 }
