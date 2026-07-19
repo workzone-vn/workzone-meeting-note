@@ -1,7 +1,9 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
+import * as crypto from 'crypto'
 import * as fs from 'fs'
 import * as path from 'path'
-import { dataDir } from './paths'
+import { IMAGE_EXTS } from './assetProtocol'
+import { dataDir, wikiDir } from './paths'
 import { IPC, IPC_EVENTS } from '../shared/ipc-contract'
 import type {
   PipelineState,
@@ -51,7 +53,15 @@ import {
   saveNote
 } from './wiki/WikiStore'
 import { getSetupStatus, startSetup } from './setup/SetupService'
-import { getSettings, setSettings } from './settings/SettingsStore'
+import {
+  getGitSyncConfig,
+  getSettings,
+  readGithubToken,
+  setGitSyncConfig,
+  setSettings,
+  writeGithubToken
+} from './settings/SettingsStore'
+import { syncWiki, testConnection } from './gitsync/GitSync'
 import {
   createTask,
   createTasks,
@@ -371,6 +381,96 @@ export function registerIpc(): void {
     shell.showItemInFolder(res.filePath)
     return { saved: res.filePath }
   })
+  // Ghép note thành markdown "sạch" portable (Obsidian-compatible): H1 tiêu đề +
+  // tag inline (#..) + nội dung; giữ nguyên [[wikilink]]. Dùng chung cho copy & tải.
+  const noteToMarkdown = (note: { title: string; tags: string[]; content: string }): string => {
+    const head = `# ${note.title}\n`
+    const tags = note.tags.length ? `\n${note.tags.map((t) => `#${t}`).join(' ')}\n` : ''
+    const body = note.content.trim()
+    return `${head}${tags}${body ? '\n' + body : ''}\n`
+  }
+  // Copy markdown vào clipboard (Electron clipboard, không phụ thuộc secure-context).
+  ipcMain.handle(IPC.wikiCopyMarkdown, (_e, id: string) => {
+    clipboard.writeText(noteToMarkdown(getNote(id)))
+    return { copied: true }
+  })
+  // Tải file .md: user chọn nơi lưu (mặc định ~/Downloads/<tiêu đề>.md).
+  ipcMain.handle(IPC.wikiExportMarkdown, async (_e, id: string) => {
+    const note = getNote(id)
+    const res = await dialog.showSaveDialog({
+      defaultPath: path.join(
+        app.getPath('downloads'),
+        `${note.title.replace(/[/\\:]/g, '-')}.md`
+      ),
+      filters: [{ name: 'Markdown', extensions: ['md'] }]
+    })
+    if (res.canceled || !res.filePath) return { saved: null }
+    await fs.promises.writeFile(res.filePath, noteToMarkdown(note), 'utf8')
+    shell.showItemInFolder(res.filePath)
+    return { saved: res.filePath }
+  })
+  // Lưu ảnh kéo-thả/dán từ editor: renderer gửi base64 + đuôi; ghi vào wiki/assets
+  // tên duy nhất, trả đường dẫn TƯƠNG ĐỐI để chèn ![](assets/..) (portable).
+  ipcMain.handle(IPC.wikiSaveAsset, async (_e, base64: string, ext: string) => {
+    const e = (ext || 'png').toLowerCase().replace(/[^a-z0-9]/g, '')
+    if (!IMAGE_EXTS.includes(e)) throw new Error(`Định dạng ảnh không hỗ trợ: ${ext}`)
+    const dir = path.join(wikiDir, 'assets')
+    await fs.promises.mkdir(dir, { recursive: true })
+    const name = `img-${Date.now().toString(36)}-${crypto.randomBytes(4).toString('hex')}.${e}`
+    await fs.promises.writeFile(path.join(dir, name), Buffer.from(base64, 'base64'))
+    return { rel: `assets/${name}` }
+  })
+
+  // ---------- Đồng bộ Wiki lên GitHub ----------
+  ipcMain.handle(IPC.gitSyncConfigGet, () => ({
+    config: getGitSyncConfig(),
+    tokenSet: readGithubToken() !== null
+  }))
+  ipcMain.handle(IPC.gitSyncConfigSet, (_e, patch) => setGitSyncConfig(patch))
+  ipcMain.handle(IPC.gitSyncSetToken, (_e, token: string | null) => {
+    writeGithubToken(token && token.trim() ? token.trim() : null)
+  })
+  ipcMain.handle(IPC.gitSyncTest, async () => {
+    const cfg = getGitSyncConfig()
+    const token = readGithubToken()
+    if (!cfg.repoUrl) return { ok: false, message: 'Chưa nhập Repo URL.' }
+    if (!token) return { ok: false, message: 'Chưa nhập GitHub token.' }
+    return testConnection({ remoteUrl: cfg.repoUrl, token })
+  })
+  ipcMain.handle(IPC.gitSyncNow, async (e) => {
+    const cfg = getGitSyncConfig()
+    const token = readGithubToken()
+    if (!cfg.repoUrl || !token) {
+      const r = { status: 'error' as const, message: 'Chưa cấu hình Repo URL hoặc token.' }
+      setGitSyncConfig({ lastSyncStatus: 'error', lastSyncMessage: r.message })
+      throw new Error(r.message)
+    }
+    try {
+      const res = await syncWiki({
+        dir: wikiDir,
+        remoteUrl: cfg.repoUrl,
+        branch: cfg.branch,
+        token,
+        authorName: cfg.authorName,
+        authorEmail: cfg.authorEmail,
+        onProgress: (p) => e.sender.send(IPC_EVENTS.gitSyncProgress, p)
+      })
+      setGitSyncConfig({
+        lastSyncedAt: Date.now(),
+        lastSyncStatus: res.status,
+        lastSyncMessage:
+          res.status === 'conflict'
+            ? `Xung đột (đã giữ cả 2 bản, xem file .remote-*): ${(res.conflicts ?? []).join(', ')}`
+            : 'Đồng bộ thành công.'
+      })
+      return res
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      setGitSyncConfig({ lastSyncedAt: Date.now(), lastSyncStatus: 'error', lastSyncMessage: message })
+      throw err
+    }
+  })
+
   // Hỏi wiki bằng AI: engine chấm điểm từ khoá + lan theo wikilink rồi hỏi Claude.
   ipcMain.handle(IPC.wikiAsk, async (_e, question: string) => {
     const r = await runStreaming(['wiki-ask'], () => {}, 5 * 60_000, question)

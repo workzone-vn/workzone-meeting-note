@@ -32,6 +32,9 @@ export const IPC = {
   wikiResolve: 'wiki:resolve',
   wikiAsk: 'wiki:ask',
   wikiExportPdf: 'wiki:exportPdf',
+  wikiCopyMarkdown: 'wiki:copyMarkdown',
+  wikiExportMarkdown: 'wiki:exportMarkdown',
+  wikiSaveAsset: 'wiki:saveAsset',
   devicesList: 'devices:list',
   settingsGet: 'settings:get',
   settingsSet: 'settings:set',
@@ -49,12 +52,18 @@ export const IPC = {
   tasksDelete: 'tasks:delete',
   openExternal: 'shell:openExternal',
   openScreenRecordingPrefs: 'shell:openScreenRecordingPrefs',
-  appVersion: 'app:version'
+  appVersion: 'app:version',
+  gitSyncConfigGet: 'gitSync:configGet',
+  gitSyncConfigSet: 'gitSync:configSet',
+  gitSyncSetToken: 'gitSync:setToken',
+  gitSyncTest: 'gitSync:test',
+  gitSyncNow: 'gitSync:now'
 } as const
 
 // Sự kiện main -> renderer (webContents.send)
 export const IPC_EVENTS = {
   setupProgress: 'setup:progress',
   pipelineProgress: 'pipeline:progress',
-  recorderChanged: 'recorder:changed'
+  recorderChanged: 'recorder:changed',
+  gitSyncProgress: 'gitSync:progress'
 } as const

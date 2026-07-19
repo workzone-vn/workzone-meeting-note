@@ -3,6 +3,7 @@ import { IPC, IPC_EVENTS } from '../shared/ipc-contract'
 import type {
   AudioDevice,
   EngineCheck,
+  GitSyncConfig,
   MeetingDetail,
   MeetingSummary,
   MeetingWikiNoteResult,
@@ -21,6 +22,7 @@ import type {
   Task,
   TaskInput
 } from '../shared/types'
+import type { SyncPhase, SyncResult } from '../main/gitsync/GitSync'
 
 function on<T>(channel: string) {
   return (cb: (payload: T) => void): (() => void) => {
@@ -73,6 +75,12 @@ export const wzApi = {
   wikiAsk: (question: string): Promise<WikiAskResult> => ipcRenderer.invoke(IPC.wikiAsk, question),
   wikiExportPdf: (id: string, bodyHtml: string): Promise<{ saved: string | null }> =>
     ipcRenderer.invoke(IPC.wikiExportPdf, id, bodyHtml),
+  wikiCopyMarkdown: (id: string): Promise<{ copied: boolean }> =>
+    ipcRenderer.invoke(IPC.wikiCopyMarkdown, id),
+  wikiExportMarkdown: (id: string): Promise<{ saved: string | null }> =>
+    ipcRenderer.invoke(IPC.wikiExportMarkdown, id),
+  wikiSaveAsset: (base64: string, ext: string): Promise<{ rel: string }> =>
+    ipcRenderer.invoke(IPC.wikiSaveAsset, base64, ext),
   meetingsSaveBienban: (name: string, content: string): Promise<void> =>
     ipcRenderer.invoke(IPC.meetingsSaveBienban, name, content),
   meetingsDelete: (name: string): Promise<{ deleted: boolean }> =>
@@ -111,9 +119,19 @@ export const wzApi = {
   openScreenRecordingPrefs: (): Promise<void> =>
     ipcRenderer.invoke(IPC.openScreenRecordingPrefs),
   appVersion: (): Promise<string> => ipcRenderer.invoke(IPC.appVersion),
+  gitSyncConfigGet: (): Promise<{ config: GitSyncConfig; tokenSet: boolean }> =>
+    ipcRenderer.invoke(IPC.gitSyncConfigGet),
+  gitSyncConfigSet: (config: Partial<GitSyncConfig>): Promise<GitSyncConfig> =>
+    ipcRenderer.invoke(IPC.gitSyncConfigSet, config),
+  gitSyncSetToken: (token: string | null): Promise<void> =>
+    ipcRenderer.invoke(IPC.gitSyncSetToken, token),
+  gitSyncTest: (): Promise<{ ok: boolean; message?: string }> =>
+    ipcRenderer.invoke(IPC.gitSyncTest),
+  gitSyncNow: (): Promise<SyncResult> => ipcRenderer.invoke(IPC.gitSyncNow),
   onSetupProgress: on<SetupProgress>(IPC_EVENTS.setupProgress),
   onPipelineProgress: on<PipelineState>(IPC_EVENTS.pipelineProgress),
-  onRecorderChanged: on<RecorderStatus>(IPC_EVENTS.recorderChanged)
+  onRecorderChanged: on<RecorderStatus>(IPC_EVENTS.recorderChanged),
+  onGitSyncProgress: on<SyncPhase>(IPC_EVENTS.gitSyncProgress)
 }
 
 export type WzApi = typeof wzApi
